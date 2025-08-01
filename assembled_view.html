@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Assembled Furniture View</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        canvas { border: 2px solid #333; margin: 20px auto; display: block; background: white; }
+        .info { text-align: center; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Assembled Furniture View (Top Down)</h1>
+    <div class="info">This shows how your furniture will look when assembled - panel view from above</div>
+    <input type="file" id="jsonFile" accept=".json">
+    <canvas id="assembledView" width="600" height="800"></canvas>
+
+    <script>
+        document.getElementById('jsonFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        drawAssembledView(data);
+                    } catch (error) {
+                        alert('Error: Invalid JSON file');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function drawAssembledView(data) {
+            const canvas = document.getElementById('assembledView');
+            const ctx = canvas.getContext('2d');
+            const scale = 1.8;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Find the main panel (tampo)
+            const panel = data.pieces.find(p => p.name.toLowerCase().includes('tampo'));
+            const legs = data.pieces.filter(p => p.name.toLowerCase().includes('perna'));
+            
+            if (!panel) return;
+            
+            // Center the drawing
+            const offsetX = (canvas.width - panel.length * scale) / 2;
+            const offsetY = 100;
+            
+            // Draw panel outline (top view)
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(offsetX, offsetY, panel.length * scale, panel.height * scale);
+            
+            // Add panel label
+            ctx.fillStyle = '#000';
+            ctx.font = '16px Arial';
+            ctx.fillText('Table Top (Panel)', offsetX, offsetY - 10);
+            
+            // Draw panel's own connection areas (main and other_main faces)
+            const panelMainFace = panel.faces.find(f => f.faceSide === 'main');
+            const panelOtherFace = panel.faces.find(f => f.faceSide === 'other_main');
+            
+            // Draw main face connection areas (top edge)
+            if (panelMainFace && panelMainFace.connectionAreas.length > 0) {
+                panelMainFace.connectionAreas.forEach(connArea => {
+                    // Map main face coordinates to panel view (top edge)
+                    const panelX = offsetX + connArea.x_min * scale;
+                    const panelY = offsetY;  // Top edge
+                    const areaWidth = (connArea.x_max - connArea.x_min) * scale;
+                    const areaHeight = (connArea.y_max - connArea.y_min) * scale;
+                    
+                    // Draw grey rectangle with panel's actual dimensions
+                    ctx.fillStyle = 'rgba(150, 150, 150, 0.7)';
+                    ctx.fillRect(panelX, panelY, areaWidth, areaHeight);
+                    
+                    // Add red border
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(panelX, panelY, areaWidth, areaHeight);
+                    
+                    // Add connection ID label
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText(`Conn ${connArea.connectionId}`, panelX + 5, panelY + 15);
+                });
+            }
+            
+            // Draw other_main face connection areas (bottom edge)
+            if (panelOtherFace && panelOtherFace.connectionAreas.length > 0) {
+                panelOtherFace.connectionAreas.forEach(connArea => {
+                    // Map other_main face coordinates to panel view (bottom edge)
+                    const panelX = offsetX + connArea.x_min * scale;
+                    const panelY = offsetY + panel.height * scale - (connArea.y_max - connArea.y_min) * scale;  // Bottom edge
+                    const areaWidth = (connArea.x_max - connArea.x_min) * scale;
+                    const areaHeight = (connArea.y_max - connArea.y_min) * scale;
+                    
+                    // Draw grey rectangle with panel's actual dimensions
+                    ctx.fillStyle = 'rgba(150, 150, 150, 0.7)';
+                    ctx.fillRect(panelX, panelY, areaWidth, areaHeight);
+                    
+                    // Add red border
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(panelX, panelY, areaWidth, areaHeight);
+                    
+                    // Add connection ID label
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText(`Conn ${connArea.connectionId}`, panelX + 5, panelY + 15);
+                });
+            }
+            
+            // Draw leg connection holes on the panel (mapped to main/other_main faces)
+            legs.forEach((leg, legIndex) => {
+                const legTopFace = leg.faces.find(f => f.faceSide === 'top');
+                if (legTopFace && legTopFace.holes) {
+                    legTopFace.holes.forEach((hole, holeIndex) => {
+                        if (hole.connectionId) { // Only connection holes
+                            // Map leg hole positions to panel positions (main face for leg 1, other_main for leg 2)
+                            const panelX = offsetX + hole.x * scale;
+                            const panelY = offsetY + (legIndex === 0 ? 10 : panel.height * scale - 10);  // Top for leg 1, bottom for leg 2
+                            
+                            // Draw hole
+                            ctx.beginPath();
+                            ctx.arc(panelX, panelY, 8, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#000';
+                            ctx.fill();
+                            
+                            // Add hole label
+                            ctx.fillStyle = '#fff';
+                            ctx.font = 'bold 12px Arial';
+                            const labels = ['A', 'B', 'C', 'D'];
+                            const label = labels[legIndex * 2 + holeIndex] || `H${holeIndex + 1}`;
+                            ctx.fillText(label, panelX - 4, panelY + 4);
+                        }
+                    });
+                }
+            });
+            
+            // Draw panel systematic holes (on main/other_main faces)
+            // Show systematic holes as small dots
+            [panelMainFace, panelOtherFace].forEach((face, faceIndex) => {
+                if (face && face.holes) {
+                    face.holes.forEach(hole => {
+                        if (!hole.connectionId) { // Only systematic holes
+                            const holeX = offsetX + (hole.x / panel.length) * panel.length * scale;
+                            const holeY = offsetY + (faceIndex === 0 ? 10 : panel.height * scale - 10);
+                            
+                            ctx.beginPath();
+                            ctx.arc(holeX, holeY, 4, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#ff9800';
+                            ctx.fill();
+                            ctx.strokeStyle = '#000';
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+                    });
+                }
+            });
+            
+            // Add reference crosses at corners
+            const crossSize = 10;
+            [
+                [offsetX - 20, offsetY - 20],
+                [offsetX + panel.length * scale + 10, offsetY - 20],
+                [offsetX - 20, offsetY + panel.height * scale + 10],
+                [offsetX + panel.length * scale + 10, offsetY + panel.height * scale + 10]
+            ].forEach(([x, y]) => {
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x - crossSize, y);
+                ctx.lineTo(x + crossSize, y);
+                ctx.moveTo(x, y - crossSize);
+                ctx.lineTo(x, y + crossSize);
+                ctx.stroke();
+            });
+            
+            // Add dimensions
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.fillText(`${panel.length}mm`, offsetX + panel.length * scale / 2 - 20, offsetY + panel.height * scale + 30);
+            ctx.fillText(`${panel.height}mm`, offsetX - 50, offsetY + panel.height * scale / 2);
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,219 @@
+{
+  "pieces": [
+    {
+      "name": "perna direita",
+      "length": 200,
+      "height": 200,
+      "thickness": 19.9,
+      "quantity": 1,
+      "faces": [
+        {
+          "faceSide": "top",
+          "holes": [
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20,
+              "connectionId": 1
+            },
+            {
+              "x": 190.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20,
+              "connectionId": 1
+            }
+          ],
+          "connectionAreas": [
+            {
+              "x_min": 0.0,
+              "y_min": 0.0,
+              "x_max": 200.0,
+              "y_max": 19.9,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "perna esquerda",
+      "length": 200,
+      "height": 200,
+      "thickness": 19.9,
+      "quantity": 1,
+      "faces": [
+        {
+          "faceSide": "top",
+          "holes": [
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20,
+              "connectionId": 2
+            },
+            {
+              "x": 190.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20,
+              "connectionId": 2
+            }
+          ],
+          "connectionAreas": [
+            {
+              "x_min": 0.0,
+              "y_min": 0.0,
+              "x_max": 200.0,
+              "y_max": 19.9,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tampo",
+      "length": 200,
+      "height": 299.9,
+      "thickness": 19.9,
+      "quantity": 1,
+      "faces": [
+        {
+          "faceSide": "main",
+          "holes": [
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "flap_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 1,
+              "depth": 20
+            },
+            {
+              "x": 190.0,
+              "y": 10.0,
+              "type": "flap_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 1,
+              "depth": 20
+            }
+          ],
+          "connectionAreas": [
+            {
+              "x_min": 0.0,
+              "x_max": 200.0,
+              "y_min": 0.0,
+              "y_max": 19.9,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            }
+          ]
+        },
+        {
+          "faceSide": "other_main",
+          "holes": [
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "flap_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 2,
+              "depth": 20
+            },
+            {
+              "x": 190.0,
+              "y": 10.0,
+              "type": "flap_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 2,
+              "depth": 20
+            }
+          ],
+          "connectionAreas": [
+            {
+              "x_min": 0.0,
+              "x_max": 200.0,
+              "y_min": 0.0,
+              "y_max": 19.9,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 2
+            }
+          ]
+        },
+        {
+          "faceSide": "top",
+          "holes": [
+            {
+              "x": 190.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20,
+              "connectionId": 1
+            }
+          ],
+          "connectionAreas": [
+            {
+              "x_min": 19.9,
+              "x_max": 39.8,
+              "y_min": 0.0,
+              "y_max": 200.933,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            },
+            {
+              "x_min": 180.1,
+              "x_max": 200.0,
+              "y_min": 0.0,
+              "y_max": 200.933,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

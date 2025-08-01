@@ -18,8 +18,7 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "depth": 20,
-              "connectionId": 1
+              "depth": 20
             },
             {
               "x": 190.0,
@@ -29,8 +28,7 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "depth": 20,
-              "connectionId": 1
+              "depth": 20
             }
           ],
           "connectionAreas": [
@@ -65,8 +63,7 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "depth": 20,
-              "connectionId": 2
+              "depth": 20
             },
             {
               "x": 190.0,
@@ -76,8 +73,7 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "depth": 20,
-              "connectionId": 2
+              "depth": 20
             }
           ],
           "connectionAreas": [
@@ -110,10 +106,21 @@
               "type": "flap_corner",
               "targetType": "20",
               "ferragemSymbols": [
-                "glue"
+                "dowel_M_with_glue"
               ],
-              "connectionId": 1,
-              "depth": 20
+              "depth": 10,
+              "diameter": 8
+            },
+            {
+              "x": 10.0,
+              "y": 289.9,
+              "type": "flap_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "dowel_M_with_glue"
+              ],
+              "depth": 10,
+              "diameter": 8
             },
             {
               "x": 190.0,
@@ -121,23 +128,46 @@
               "type": "flap_corner",
               "targetType": "20",
               "ferragemSymbols": [
-                "glue"
+                "dowel_M_with_glue"
               ],
-              "connectionId": 1,
-              "depth": 20
+              "depth": 10,
+              "diameter": 8
+            },
+            {
+              "x": 190.0,
+              "y": 289.9,
+              "type": "flap_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "dowel_M_with_glue"
+              ],
+              "depth": 10,
+              "diameter": 8
+            },
+            {
+              "x": 10.0,
+              "y": 150.0,
+              "type": "flap_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "dowel_M_with_glue"
+              ],
+              "depth": 10,
+              "diameter": 8
+            },
+            {
+              "x": 190.0,
+              "y": 150.0,
+              "type": "flap_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "dowel_M_with_glue"
+              ],
+              "depth": 10,
+              "diameter": 8
             }
           ],
-          "connectionAreas": [
-            {
-              "x_min": 0.0,
-              "x_max": 200.0,
-              "y_min": 0.0,
-              "y_max": 19.9,
-              "fill": "black",
-              "opacity": 0.05,
-              "connectionId": 1
-            }
-          ]
+          "connectionAreas": []
         },
         {
           "faceSide": "other_main",
@@ -148,10 +178,21 @@
               "type": "flap_corner",
               "targetType": "20",
               "ferragemSymbols": [
-                "glue"
+                "dowel_M_with_glue"
               ],
-              "connectionId": 2,
-              "depth": 20
+              "depth": 10,
+              "diameter": 8
+            },
+            {
+              "x": 10.0,
+              "y": 289.9,
+              "type": "flap_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "dowel_M_with_glue"
+              ],
+              "depth": 10,
+              "diameter": 8
             },
             {
               "x": 190.0,
@@ -159,27 +200,60 @@
               "type": "flap_corner",
               "targetType": "20",
               "ferragemSymbols": [
-                "glue"
+                "dowel_M_with_glue"
               ],
-              "connectionId": 2,
-              "depth": 20
+              "depth": 10,
+              "diameter": 8
+            },
+            {
+              "x": 190.0,
+              "y": 289.9,
+              "type": "flap_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "dowel_M_with_glue"
+              ],
+              "depth": 10,
+              "diameter": 8
+            },
+            {
+              "x": 10.0,
+              "y": 150.0,
+              "type": "flap_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "dowel_M_with_glue"
+              ],
+              "depth": 10,
+              "diameter": 8
+            },
+            {
+              "x": 190.0,
+              "y": 150.0,
+              "type": "flap_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "dowel_M_with_glue"
+              ],
+              "depth": 10,
+              "diameter": 8
             }
           ],
-          "connectionAreas": [
-            {
-              "x_min": 0.0,
-              "x_max": 200.0,
-              "y_min": 0.0,
-              "y_max": 19.9,
-              "fill": "black",
-              "opacity": 0.05,
-              "connectionId": 2
-            }
-          ]
+          "connectionAreas": []
         },
         {
           "faceSide": "top",
           "holes": [
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20
+            },
             {
               "x": 190.0,
               "y": 10.0,
@@ -188,8 +262,7 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "depth": 20,
-              "connectionId": 1
+              "depth": 20
             }
           ],
           "connectionAreas": [
@@ -212,6 +285,148 @@
               "connectionId": 1
             }
           ]
+        },
+        {
+          "faceSide": "bottom",
+          "holes": [
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20
+            },
+            {
+              "x": 190.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20
+            },
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 1,
+              "depth": 20
+            },
+            {
+              "x": 190.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 1,
+              "depth": 20
+            },
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 2,
+              "depth": 20
+            },
+            {
+              "x": 190.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 2,
+              "depth": 20
+            }
+          ],
+          "connectionAreas": []
+        },
+        {
+          "faceSide": "left",
+          "holes": [
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20
+            },
+            {
+              "x": 10.0,
+              "y": 289.9,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20
+            },
+            {
+              "x": 10.0,
+              "y": 150.0,
+              "type": "top_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20
+            }
+          ],
+          "connectionAreas": []
+        },
+        {
+          "faceSide": "right",
+          "holes": [
+            {
+              "x": 10.0,
+              "y": 10.0,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20
+            },
+            {
+              "x": 10.0,
+              "y": 289.9,
+              "type": "top_corner",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20
+            },
+            {
+              "x": 10.0,
+              "y": 150.0,
+              "type": "top_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "depth": 20
+            }
+          ],
+          "connectionAreas": []
         }
       ]
     }

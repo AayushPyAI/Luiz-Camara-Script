@@ -43,7 +43,14 @@
             const panel = data.pieces.find(p => p.name.toLowerCase().includes('tampo'));
             const legs = data.pieces.filter(p => p.name.toLowerCase().includes('perna'));
             
-            if (!panel) return;
+            if (!panel) {
+                ctx.fillStyle = '#ff0000';
+                ctx.font = '16px Arial';
+                ctx.fillText('No tampo piece found in JSON', 50, 50);
+                return;
+            }
+            
+            console.log('Found panel:', panel.name, 'with dimensions:', panel.length, 'x', panel.height, 'x', panel.thickness);
             
             // Center the drawing
             const offsetX = (canvas.width - panel.length * scale) / 2;
@@ -59,104 +66,71 @@
             ctx.font = '16px Arial';
             ctx.fillText('Table Top (Panel)', offsetX, offsetY - 10);
             
-            // Draw panel's own connection areas (main and other_main faces)
+            // Get faces as arrays (they're stored as arrays, not objects)
             const panelMainFace = panel.faces.find(f => f.faceSide === 'main');
-            const panelOtherFace = panel.faces.find(f => f.faceSide === 'other_main');
+            const panelOtherMainFace = panel.faces.find(f => f.faceSide === 'other_main');
+            const panelTopFace = panel.faces.find(f => f.faceSide === 'top');
             
-            // Draw main face connection areas (top edge)
-            if (panelMainFace && panelMainFace.connectionAreas.length > 0) {
-                panelMainFace.connectionAreas.forEach(connArea => {
-                    // Map main face coordinates to panel view (top edge)
-                    const panelX = offsetX + connArea.x_min * scale;
-                    const panelY = offsetY;  // Top edge
-                    const areaWidth = (connArea.x_max - connArea.x_min) * scale;
-                    const areaHeight = (connArea.y_max - connArea.y_min) * scale;
-                    
-                    // Draw grey rectangle with panel's actual dimensions
-                    ctx.fillStyle = 'rgba(150, 150, 150, 0.7)';
-                    ctx.fillRect(panelX, panelY, areaWidth, areaHeight);
-                    
-                    // Add red border
-                    ctx.strokeStyle = '#ff0000';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(panelX, panelY, areaWidth, areaHeight);
-                    
-                    // Add connection ID label
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 14px Arial';
-                    ctx.fillText(`Conn ${connArea.connectionId}`, panelX + 5, panelY + 15);
-                });
-            }
-            
-            // Draw other_main face connection areas (bottom edge)
-            if (panelOtherFace && panelOtherFace.connectionAreas.length > 0) {
-                panelOtherFace.connectionAreas.forEach(connArea => {
-                    // Map other_main face coordinates to panel view (bottom edge)
-                    const panelX = offsetX + connArea.x_min * scale;
-                    const panelY = offsetY + panel.height * scale - (connArea.y_max - connArea.y_min) * scale;  // Bottom edge
-                    const areaWidth = (connArea.x_max - connArea.x_min) * scale;
-                    const areaHeight = (connArea.y_max - connArea.y_min) * scale;
-                    
-                    // Draw grey rectangle with panel's actual dimensions
-                    ctx.fillStyle = 'rgba(150, 150, 150, 0.7)';
-                    ctx.fillRect(panelX, panelY, areaWidth, areaHeight);
-                    
-                    // Add red border
-                    ctx.strokeStyle = '#ff0000';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(panelX, panelY, areaWidth, areaHeight);
-                    
-                    // Add connection ID label
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 14px Arial';
-                    ctx.fillText(`Conn ${connArea.connectionId}`, panelX + 5, panelY + 15);
-                });
-            }
-            
-            // Draw leg connection holes on the panel (mapped to main/other_main faces)
-            legs.forEach((leg, legIndex) => {
-                const legTopFace = leg.faces.find(f => f.faceSide === 'top');
-                if (legTopFace && legTopFace.holes) {
-                    legTopFace.holes.forEach((hole, holeIndex) => {
-                        if (hole.connectionId) { // Only connection holes
-                            // Map leg hole positions to panel positions (main face for leg 1, other_main for leg 2)
-                            const panelX = offsetX + hole.x * scale;
-                            const panelY = offsetY + (legIndex === 0 ? 10 : panel.height * scale - 10);  // Top for leg 1, bottom for leg 2
-                            
-                            // Draw hole
-                            ctx.beginPath();
-                            ctx.arc(panelX, panelY, 8, 0, 2 * Math.PI);
-                            ctx.fillStyle = '#000';
-                            ctx.fill();
-                            
-                            // Add hole label
-                            ctx.fillStyle = '#fff';
-                            ctx.font = 'bold 12px Arial';
-                            const labels = ['A', 'B', 'C', 'D'];
-                            const label = labels[legIndex * 2 + holeIndex] || `H${holeIndex + 1}`;
-                            ctx.fillText(label, panelX - 4, panelY + 4);
-                        }
-                    });
-                }
+            console.log('Found faces:', {
+                main: !!panelMainFace,
+                other_main: !!panelOtherMainFace, 
+                top: !!panelTopFace
             });
             
-            // Draw panel systematic holes (on main/other_main faces)
-            // Show systematic holes as small dots
-            [panelMainFace, panelOtherFace].forEach((face, faceIndex) => {
+            // Draw connection areas from TOP face (where legs connect)
+            if (panelTopFace && panelTopFace.connectionAreas && panelTopFace.connectionAreas.length > 0) {
+                console.log('Drawing', panelTopFace.connectionAreas.length, 'connection areas from top face');
+                panelTopFace.connectionAreas.forEach((connArea, index) => {
+                    // Connection areas on top face use length x height coordinates
+                    const panelX = offsetX + connArea.x_min * scale;
+                    const panelY = offsetY + connArea.y_min * scale;
+                    const areaWidth = (connArea.x_max - connArea.x_min) * scale;
+                    const areaHeight = (connArea.y_max - connArea.y_min) * scale;
+                    
+                    // Draw gray filled rectangle (like in your reference image)
+                    ctx.fillStyle = `rgba(128, 128, 128, 0.6)`;
+                    ctx.fillRect(panelX, panelY, areaWidth, areaHeight);
+                    
+                    // Add red border
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(panelX, panelY, areaWidth, areaHeight);
+                    
+                    // Add connection area label
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.fillText(`Conn ${connArea.connectionId || index + 1}`, panelX + 2, panelY + 12);
+                });
+            }
+            
+            // Draw holes from main and other_main faces (visible from top view)
+            let holeIndex = 0;
+            const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            
+            [panelMainFace, panelOtherMainFace].forEach((face, faceIndex) => {
                 if (face && face.holes) {
-                    face.holes.forEach(hole => {
-                        if (!hole.connectionId) { // Only systematic holes
-                            const holeX = offsetX + (hole.x / panel.length) * panel.length * scale;
-                            const holeY = offsetY + (faceIndex === 0 ? 10 : panel.height * scale - 10);
-                            
-                            ctx.beginPath();
-                            ctx.arc(holeX, holeY, 4, 0, 2 * Math.PI);
-                            ctx.fillStyle = '#ff9800';
-                            ctx.fill();
-                            ctx.strokeStyle = '#000';
-                            ctx.lineWidth = 1;
-                            ctx.stroke();
-                        }
+                    console.log(`Drawing ${face.holes.length} holes from ${face.faceSide} face`);
+                    face.holes.forEach((hole) => {
+                        // Map hole positions to panel top view
+                        // Main and other_main faces use length x height coordinates (same as top view)
+                        const holeX = offsetX + hole.x * scale;
+                        const holeY = offsetY + hole.y * scale;
+                        
+                        // Draw hole circle
+                        ctx.beginPath();
+                        ctx.arc(holeX, holeY, 6, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#000';
+                        ctx.fill();
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        
+                        // Add hole label
+                        ctx.fillStyle = '#fff';
+                        ctx.font = 'bold 10px Arial';
+                        const label = labels[holeIndex % labels.length];
+                        ctx.fillText(label, holeX - 3, holeY + 3);
+                        holeIndex++;
                     });
                 }
             });
@@ -184,6 +158,17 @@
             ctx.font = '12px Arial';
             ctx.fillText(`${panel.length}mm`, offsetX + panel.length * scale / 2 - 20, offsetY + panel.height * scale + 30);
             ctx.fillText(`${panel.height}mm`, offsetX - 50, offsetY + panel.height * scale / 2);
+            
+            // Add info about what was found
+            ctx.fillStyle = '#333';
+            ctx.font = '12px Arial';
+            let infoY = 20;
+            ctx.fillText(`Panel: ${panel.name} (${panel.length}×${panel.height}×${panel.thickness}mm)`, 20, infoY);
+            infoY += 20;
+            
+            const totalHoles = (panelMainFace?.holes?.length || 0) + (panelOtherMainFace?.holes?.length || 0);
+            const totalConnAreas = panelTopFace?.connectionAreas?.length || 0;
+            ctx.fillText(`Holes: ${totalHoles}, Connection Areas: ${totalConnAreas}`, 20, infoY);
         }
     </script>
 </body>

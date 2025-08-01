@@ -116,7 +116,7 @@ def get_template_thickness(thickness):
     return min(templates, key=lambda x: abs(x - thickness))
 
 def adicionar_holes_sistematicos(peca, template_thickness):
-    """Step 4: Add ALL possible systematic holes on all faces according to guide rules"""
+    """Step 4: Add systematic holes on all faces according to guide rules"""
     h = peca["height"]
     l = peca["length"]
     t = peca["thickness"]
@@ -148,18 +148,17 @@ def adicionar_holes_sistematicos(peca, template_thickness):
         # For legs: ONLY 2 top_corner holes on top face as client expects
         face = peca["faces"]["top"]
         
-        # Add exactly 2 corner holes at proper corner positions
-        # Use half_thickness for proper corner positioning
+        # Add exactly 2 corner holes as the client expects "2 pro leg"
         corner_positions = [
-            (ft, ft, "top_corner"),            # corner 1 (left corner)
-            (l - ft, ft, "top_corner")         # corner 2 (right corner)
+            (ft, ft, "top_corner"),            # corner 1
+            (l - ft, ft, "top_corner")         # corner 2 (only 2 holes per leg)
         ]
         
         for x, y, hole_type in corner_positions:
             add_hole_if_not_exists(face["holes"], x, y, hole_type, "glue", depth=20)
         
     else:
-        # For panels: Follow guide rules exactly - PLACE ALL POSSIBLE HOLES
+        # For panels: Follow guide rules exactly
         
         # Main and other_main faces: flap_corner holes at four corners
         # Step 4: "Main and other_main faces: flap_corner holes at four corners"
@@ -168,10 +167,10 @@ def adicionar_holes_sistematicos(peca, template_thickness):
             
             # Four corner positions: (half_thickness, half_thickness), (half_thickness, height-half_thickness), etc.
             corner_positions = [
-                (ft, ft, "flap_corner"),                    # bottom-left (C)
-                (ft, h - ft, "flap_corner"),                # top-left (A)  
-                (l - ft, ft, "flap_corner"),                # bottom-right (D)
-                (l - ft, h - ft, "flap_corner")             # top-right (B)
+                (ft, ft, "flap_corner"),                    # bottom-left
+                (ft, h - ft, "flap_corner"),                # top-left  
+                (l - ft, ft, "flap_corner"),                # bottom-right
+                (l - ft, h - ft, "flap_corner")             # top-right
             ]
             
             # Add all four corner holes
@@ -186,13 +185,13 @@ def adicionar_holes_sistematicos(peca, template_thickness):
             
             # Check horizontal pairs
             if len(holes_added) >= 2:
-                # Bottom pair (C-D)
+                # Bottom pair
                 add_intermediate_holes_if_needed(face["holes"], holes_added[0], holes_added[2], "flap_central", "dowel_M_with_glue", depth=10, diameter=8)
-                # Top pair (A-B)
+                # Top pair  
                 add_intermediate_holes_if_needed(face["holes"], holes_added[1], holes_added[3], "flap_central", "dowel_M_with_glue", depth=10, diameter=8)
-                # Left pair (A-C)
+                # Left pair
                 add_intermediate_holes_if_needed(face["holes"], holes_added[0], holes_added[1], "flap_central", "dowel_M_with_glue", depth=10, diameter=8)
-                # Right pair (B-D)
+                # Right pair
                 add_intermediate_holes_if_needed(face["holes"], holes_added[2], holes_added[3], "flap_central", "dowel_M_with_glue", depth=10, diameter=8)
         
         # Top, bottom, left and right faces: top_corner holes at corners
@@ -238,223 +237,240 @@ def adicionar_holes_sistematicos(peca, template_thickness):
 # STEP 5: INFER CONNECTIONS BETWEEN PIECES
 # ============================================================================
 
+def map_piece_points(piece):
+    """Step 5: Map all significant points of a piece (vertices, edge points, face centers)"""
+    pos = piece["position"]
+    l = piece["length"]
+    h = piece["height"] 
+    t = piece["thickness"]
+    
+    points = {
+        'vertices': [
+            # Bottom face vertices
+            (pos['x'], pos['y'], pos['z']),                    # 0: bottom-left-front
+            (pos['x'] + l, pos['y'], pos['z']),                # 1: bottom-right-front  
+            (pos['x'], pos['y'] + h, pos['z']),                # 2: bottom-left-back
+            (pos['x'] + l, pos['y'] + h, pos['z']),            # 3: bottom-right-back
+            # Top face vertices
+            (pos['x'], pos['y'], pos['z'] + t),                # 4: top-left-front
+            (pos['x'] + l, pos['y'], pos['z'] + t),            # 5: top-right-front
+            (pos['x'], pos['y'] + h, pos['z'] + t),            # 6: top-left-back  
+            (pos['x'] + l, pos['y'] + h, pos['z'] + t),        # 7: top-right-back
+        ],
+        'face_centers': {
+            'main': (pos['x'] + l/2, pos['y'], pos['z'] + t/2),           # front face center
+            'other_main': (pos['x'] + l/2, pos['y'] + h, pos['z'] + t/2), # back face center
+            'top': (pos['x'] + l/2, pos['y'] + h/2, pos['z'] + t),        # top face center
+            'bottom': (pos['x'] + l/2, pos['y'] + h/2, pos['z']),         # bottom face center
+            'left': (pos['x'], pos['y'] + h/2, pos['z'] + t/2),           # left face center
+            'right': (pos['x'] + l, pos['y'] + h/2, pos['z'] + t/2),      # right face center
+        },
+        'face_bounds': {
+            'main': {
+                'min': (pos['x'], pos['y'], pos['z']),
+                'max': (pos['x'] + l, pos['y'], pos['z'] + t)
+            },
+            'other_main': {
+                'min': (pos['x'], pos['y'] + h, pos['z']),
+                'max': (pos['x'] + l, pos['y'] + h, pos['z'] + t)
+            },
+            'top': {
+                'min': (pos['x'], pos['y'], pos['z'] + t),
+                'max': (pos['x'] + l, pos['y'] + h, pos['z'] + t)
+            },
+            'bottom': {
+                'min': (pos['x'], pos['y'], pos['z']),
+                'max': (pos['x'] + l, pos['y'] + h, pos['z'])
+            },
+            'left': {
+                'min': (pos['x'], pos['y'], pos['z']),
+                'max': (pos['x'], pos['y'] + h, pos['z'] + t)
+            },
+            'right': {
+                'min': (pos['x'] + l, pos['y'], pos['z']),
+                'max': (pos['x'] + l, pos['y'] + h, pos['z'] + t)
+            }
+        }
+    }
+    return points
+
+def find_proximity_points(piece1, piece2, tolerance=5.0):
+    """Step 5: Find points between two pieces that are close to each other"""
+    points1 = map_piece_points(piece1)
+    points2 = map_piece_points(piece2)
+    
+    proximities = []
+    
+    # Check face-to-face proximity (faces that are close/touching) - MAIN FOCUS
+    for face1_name, bounds1 in points1['face_bounds'].items():
+        for face2_name, bounds2 in points2['face_bounds'].items():
+            # Check if faces are parallel and close
+            face_distance = calculate_face_to_face_distance(bounds1, bounds2, face1_name, face2_name)
+            if face_distance is not None and face_distance <= tolerance:
+                # Calculate overlap area between the faces
+                overlap_area = calculate_face_overlap(bounds1, bounds2, face1_name, face2_name)
+                if overlap_area and overlap_area['area'] > 5:  # Reduced minimum overlap area
+                    proximities.append({
+                        'type': 'face_to_face',
+                        'piece1_face': face1_name,
+                        'piece2_face': face2_name,
+                        'distance': face_distance,
+                        'overlap_area': overlap_area
+                    })
+    
+    return proximities
+
+def calculate_face_to_face_distance(bounds1, bounds2, face1_name, face2_name):
+    """Step 5: Calculate distance between two faces if they are parallel and close"""
+    # Determine face orientations
+    face_orientations = {
+        'main': 'y',      # Y-normal (front/back)
+        'other_main': 'y',
+        'top': 'z',       # Z-normal (top/bottom) 
+        'bottom': 'z',
+        'left': 'x',      # X-normal (left/right)
+        'right': 'x'
+    }
+    
+    orient1 = face_orientations.get(face1_name)
+    orient2 = face_orientations.get(face2_name)
+    
+    # Only calculate distance for parallel faces
+    if orient1 != orient2:
+        return None
+
+    if orient1 == 'x':
+        # Left/right faces - IMPROVED for leg-to-top connections
+        if face1_name == 'right' and face2_name == 'left':
+            distance = abs(bounds1['max'][0] - bounds2['min'][0])
+        elif face1_name == 'left' and face2_name == 'right':
+            distance = abs(bounds2['max'][0] - bounds1['min'][0])
+        # Also check same-side connections (left-to-left, right-to-right) for overlapping pieces
+        elif face1_name == face2_name:
+            if face1_name == 'left':
+                distance = abs(bounds1['min'][0] - bounds2['min'][0])
+            else:  # right
+                distance = abs(bounds1['max'][0] - bounds2['max'][0])
+        else:
+            return None
+        return distance
+        
+    elif orient1 == 'y':
+        # Front/back faces
+        if face1_name == 'other_main' and face2_name == 'main':
+            return abs(bounds1['min'][1] - bounds2['max'][1])
+        elif face1_name == 'main' and face2_name == 'other_main':
+            return abs(bounds2['min'][1] - bounds1['max'][1])
+            
+    elif orient1 == 'z':
+        # Top/bottom faces - IMPROVED for leg-to-top connections  
+        if face1_name == 'top' and face2_name == 'bottom':
+            distance = abs(bounds1['min'][2] - bounds2['max'][2])
+        elif face1_name == 'bottom' and face2_name == 'top':
+            distance = abs(bounds2['min'][2] - bounds1['max'][2])
+        # Also check same-side connections for overlapping pieces
+        elif face1_name == face2_name:
+            if face1_name == 'top':
+                distance = abs(bounds1['max'][2] - bounds2['max'][2])
+            else:  # bottom
+                distance = abs(bounds1['min'][2] - bounds2['min'][2])
+        else:
+            return None
+        return distance
+    
+    return None
+
+def calculate_face_overlap(bounds1, bounds2, face1_name, face2_name):
+    """Step 5: Calculate overlap area between two parallel faces"""
+    # Project both faces onto their shared plane and calculate 2D overlap
+    
+    # Get the 2D bounds for each face
+    def get_2d_bounds(bounds, face_name):
+        if face_name in ['main', 'other_main']:
+            # X-Z plane (length × height)
+            return {
+                'x_min': bounds['min'][0], 'x_max': bounds['max'][0],
+                'y_min': bounds['min'][2], 'y_max': bounds['max'][2]
+            }
+        elif face_name in ['top', 'bottom']:
+            # X-Y plane (length × thickness)  
+            return {
+                'x_min': bounds['min'][0], 'x_max': bounds['max'][0],
+                'y_min': bounds['min'][1], 'y_max': bounds['max'][1]
+            }
+        elif face_name in ['left', 'right']:
+            # Y-Z plane (thickness × height)
+            return {
+                'x_min': bounds['min'][1], 'x_max': bounds['max'][1],
+                'y_min': bounds['min'][2], 'y_max': bounds['max'][2]
+            }
+    
+    bounds2d_1 = get_2d_bounds(bounds1, face1_name)
+    bounds2d_2 = get_2d_bounds(bounds2, face2_name)
+    
+    # Calculate 2D overlap
+    x_overlap = max(0, min(bounds2d_1['x_max'], bounds2d_2['x_max']) - max(bounds2d_1['x_min'], bounds2d_2['x_min']))
+    y_overlap = max(0, min(bounds2d_1['y_max'], bounds2d_2['y_max']) - max(bounds2d_1['y_min'], bounds2d_2['y_min']))
+    
+    if x_overlap > 0 and y_overlap > 0:
+        return {
+            'x_min': max(bounds2d_1['x_min'], bounds2d_2['x_min']),
+            'x_max': min(bounds2d_1['x_max'], bounds2d_2['x_max']),
+            'y_min': max(bounds2d_1['y_min'], bounds2d_2['y_min']),
+            'y_max': min(bounds2d_1['y_max'], bounds2d_2['y_max']),
+            'area': x_overlap * y_overlap
+        }
+    
+    return None
+
 def detect_connections_by_proximity(pieces):
-    """Step 5: Detect connections between pieces using proximity and overlap analysis"""
+    """Step 5: Detect connections using point-based proximity as suggested by client"""
     connections = []
     conn_id = 1
+    seen_connections = set()  # Track face pairs to prevent duplicates
     
-    # For this specific furniture model, we know the connections:
-    # - perna direita top connects to tampo main (not bottom)
-    # - perna esquerda top connects to tampo other_main (not bottom)
-    
-    # Find the pieces
-    perna_direita = None
-    perna_esquerda = None
-    tampo = None
-    
-    for piece in pieces:
-        if "perna direita" in piece["name"].lower():
-            perna_direita = piece
-        elif "perna esquerda" in piece["name"].lower():
-            perna_esquerda = piece
-        elif "tampo" in piece["name"].lower():
-            tampo = piece
-    
-    # Create specific connections for this furniture model
-    if perna_direita and tampo:
-        # perna direita top connects to tampo main
-        connections.append({
-            'piece1': pieces.index(perna_direita),
-            'piece2': pieces.index(tampo),
-            'face1': 'top',
-            'face2': 'main',  # Changed from 'bottom' to 'main'
-            'id': conn_id
-        })
-        print(f"DEBUG: Connection {conn_id} detected between perna direita top and tampo main")
-        conn_id += 1
-    
-    if perna_esquerda and tampo:
-        # perna esquerda top connects to tampo other_main
-        connections.append({
-            'piece1': pieces.index(perna_esquerda),
-            'piece2': pieces.index(tampo),
-            'face1': 'top',
-            'face2': 'other_main',  # Changed from 'bottom' to 'other_main'
-            'id': conn_id
-        })
-        print(f"DEBUG: Connection {conn_id} detected between perna esquerda top and tampo other_main")
-        conn_id += 1
+    for i, piece1 in enumerate(pieces):
+        for j, piece2 in enumerate(pieces):
+            if i >= j:
+                continue
+            
+            proximities = find_proximity_points(piece1, piece2, tolerance=10.0)  # Increased tolerance
+            
+            if proximities:
+                # Group proximities by type and create connections
+                face_to_face_proximities = [p for p in proximities if p['type'] == 'face_to_face']
+                
+                for proximity in face_to_face_proximities:
+                    face1 = proximity['piece1_face']
+                    face2 = proximity['piece2_face']
+                    
+                    # Specific check: Only connect top faces of legs to bottom face of tampo
+                    if not ((face1 == 'top' and face2 == 'bottom') or (face1 == 'bottom' and face2 == 'top')):
+                        continue
+                    
+                    # Create unique identifier for this face pair to prevent duplicates
+                    connection_key = tuple(sorted([
+                        (i, face1),
+                        (j, face2)
+                    ]))
+                    
+                    # Only create connection if we haven't seen this face pair before
+                    if connection_key not in seen_connections:
+                        seen_connections.add(connection_key)
+                        
+                        connections.append({
+                            'id': conn_id,
+                            'piece1': i,
+                            'piece2': j,
+                            'proximity': proximity,
+                            'face1': face1,
+                            'face2': face2,
+                            'overlap_area': proximity['overlap_area']
+                        })
+                        print(f"DEBUG: Connection {conn_id} detected between {piece1['name']} {face1} and {piece2['name']} {face2}")
+                        conn_id += 1
     
     return connections
-
-def detect_actual_connection_points(pieces, connections):
-    """Step 5.5: Detect actual connection points between pieces based on their positions"""
-    print("Detecting actual connection points between pieces...")
-    
-    connection_points = {}
-    
-    for conn in connections:
-        piece1_name = pieces[conn['piece1']]['name']
-        piece2_name = pieces[conn['piece2']]['name']
-        face1 = conn['face1']
-        face2 = conn['face2']
-        conn_id = conn['id']
-        
-        # Get the pieces
-        piece1 = next(p for p in pieces if p['name'] == piece1_name)
-        piece2 = next(p for p in pieces if p['name'] == piece2_name)
-        
-        print(f"Connection {conn_id}: {piece1_name} {face1} -> {piece2_name} {face2}")
-        
-        # For this specific furniture model:
-        # - perna direita connects to tampo main at specific positions
-        # - perna esquerda connects to tampo other_main at specific positions
-        
-        if "perna direita" in piece1_name.lower() and "tampo" in piece2_name.lower():
-            # perna direita connects to tampo main
-            # Map leg positions to panel positions
-            leg_holes = piece1["faces"][face1]["holes"]
-            panel_connection_points = []
-            
-            for leg_hole in leg_holes:
-                if leg_hole.get("connectionId") == conn_id:
-                    # Map leg hole position to panel position
-                    # For this model: leg is 200x200, panel is 200x299.9
-                    # Leg holes are at (10, 10) and (190, 10)
-                    # Map to panel main face
-                    panel_x = leg_hole["x"]  # Same x position
-                    panel_y = 10.0  # Top edge of panel
-                    
-                    panel_connection_points.append({
-                        "x": panel_x,
-                        "y": panel_y,
-                        "type": "flap_corner",
-                        "hardware": leg_hole.get("ferragemSymbols", ["glue"])[0],
-                        "depth": leg_hole.get("depth", 20),
-                        "diameter": leg_hole.get("diameter")
-                    })
-            
-            connection_points[conn_id] = {
-                "piece1": piece1_name,
-                "piece2": piece2_name,
-                "face1": face1,
-                "face2": face2,
-                "points": panel_connection_points
-            }
-            
-            print(f"  Mapped {len(panel_connection_points)} connection points")
-        
-        elif "perna esquerda" in piece1_name.lower() and "tampo" in piece2_name.lower():
-            # perna esquerda connects to tampo other_main
-            # Map leg positions to panel positions
-            leg_holes = piece1["faces"][face1]["holes"]
-            panel_connection_points = []
-            
-            for leg_hole in leg_holes:
-                if leg_hole.get("connectionId") == conn_id:
-                    # Map leg hole position to panel position
-                    # For this model: leg is 200x200, panel is 200x299.9
-                    # Leg holes are at (10, 10) and (190, 10)
-                    # Map to panel other_main face
-                    panel_x = leg_hole["x"]  # Same x position
-                    panel_y = piece2["height"] - 10.0  # Bottom edge of panel
-                    
-                    panel_connection_points.append({
-                        "x": panel_x,
-                        "y": panel_y,
-                        "type": "flap_corner",
-                        "hardware": leg_hole.get("ferragemSymbols", ["glue"])[0],
-                        "depth": leg_hole.get("depth", 20),
-                        "diameter": leg_hole.get("diameter")
-                    })
-            
-            connection_points[conn_id] = {
-                "piece1": piece1_name,
-                "piece2": piece2_name,
-                "face1": face1,
-                "face2": face2,
-                "points": panel_connection_points
-            }
-            
-            print(f"  Mapped {len(panel_connection_points)} connection points")
-    
-    return connection_points
-
-def create_connection_areas_at_actual_points(pieces, connection_points):
-    """Step 5.6: Create connection areas at actual connection points"""
-    print("Creating connection areas at actual connection points...")
-    
-    for conn_id, conn_data in connection_points.items():
-        piece2_name = conn_data["piece2"]
-        face2 = conn_data["face2"]
-        
-        # Find the target piece
-        piece2 = next(p for p in pieces if p['name'] == piece2_name)
-        
-        # Create connection areas at each connection point
-        for point in conn_data["points"]:
-            x, y = point["x"], point["y"]
-            
-            # Create small connection area around the point
-            corner_size = piece2["thickness"]  # Use piece thickness for corner size
-            
-            # Determine corner position based on point location
-            if x < piece2["length"] / 2:  # Left side
-                area_x_min = 0.0
-                area_x_max = corner_size
-            else:  # Right side
-                area_x_min = piece2["length"] - corner_size
-                area_x_max = piece2["length"]
-            
-            if y < piece2["height"] / 2:  # Top side
-                area_y_min = 0.0
-                area_y_max = corner_size
-            else:  # Bottom side
-                area_y_min = piece2["height"] - corner_size
-                area_y_max = piece2["height"]
-            
-            # Create connection area
-            connection_area = {
-                "x_min": area_x_min,
-                "x_max": area_x_max,
-                "y_min": area_y_min,
-                "y_max": area_y_max,
-                "fill": "black",
-                "opacity": 0.05,
-                "connectionId": conn_id
-            }
-            
-            piece2["faces"][face2]["connectionAreas"].append(connection_area)
-            print(f"  Created connection area at ({area_x_min}, {area_y_min}) - ({area_x_max}, {area_y_max})")
-
-def place_holes_at_actual_connection_points(pieces, connection_points):
-    """Step 5.7: Place holes at actual connection points"""
-    print("Placing holes at actual connection points...")
-    
-    for conn_id, conn_data in connection_points.items():
-        piece2_name = conn_data["piece2"]
-        face2 = conn_data["face2"]
-        
-        # Find the target piece
-        piece2 = next(p for p in pieces if p['name'] == piece2_name)
-        
-        # Place holes at each connection point
-        for point in conn_data["points"]:
-            x, y = point["x"], point["y"]
-            
-            # Create hole at the exact connection point
-            hole = criar_hole(
-                x, y,
-                point["type"],
-                piece2.get("template_thickness", 20),
-                point["hardware"],
-                connection_id=conn_id,
-                depth=point["depth"],
-                diameter=point["diameter"]
-            )
-            
-            piece2["faces"][face2]["holes"].append(hole)
-            print(f"  Placed hole at ({x}, {y}) - {point['type']}")
 
 # ============================================================================
 # STEP 6: MAP HOLES BETWEEN CONNECTED PIECES
@@ -837,21 +853,25 @@ def transform_leg_to_top_coordinates(leg_piece, top_piece, leg_face, top_face, l
         # Map to corresponding position in top connection area
         top_x = top_area["x_min"] + leg_rel_x * (top_area["x_max"] - top_area["x_min"])
         top_y = top_area["y_min"] + leg_rel_y * (top_area["y_max"] - top_area["y_min"])
-    
-    return top_x, top_y
+        
+        return top_x, top_y
     
     return None, None
 
 # Helper to decide if we should create a connection area on a given face
 
 def _should_create_conn_area(piece, face_name):
-    """Step 10: Determine which faces should have connection areas"""
+    """Step 7: Create connection areas on leg top faces AND panel faces (main, other_main, and top)."""
     def is_leg_piece(p):
         return ("perna" in p["name"].lower()) or (abs(p["length"] - p["height"]) < 50 and max(p["length"], p["height"]) < 250)
     
+    # Create connection areas on:
+    # 1. Top face of legs 
+    # 2. Main/other_main faces of panels
+    # 3. Top face of panels (like tampo)
     if is_leg_piece(piece) and face_name == "top":
         return True
-    elif not is_leg_piece(piece) and face_name in ["main", "other_main"]:  # Changed from top to main/other_main
+    elif not is_leg_piece(piece) and face_name in ["main", "other_main", "top"]:
         return True
     else:
         return False
@@ -1136,56 +1156,33 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
             piece["faces"][face_name]["connectionAreas"].append(right_stripe)
     
     elif face_name in ["main", "other_main"]:
-        # For main faces: SMALL CORNER AREAS (like A, B, C, D in the image)
-        corner_size = piece["thickness"]  # Use piece thickness for corner size
+        # For main faces: vertical stripes on edges
+        stripe_width = piece["thickness"]  # Use piece thickness for stripe width
+        spacing = piece["length"] * 0.8  # Dynamic spacing based on piece length
         
-        # Top-left corner (A)
-        top_left_corner = {
+        # Left stripe
+        left_stripe = {
             "x_min": 0.0,
-            "x_max": corner_size,
+            "x_max": stripe_width,
             "y_min": 0.0,
-            "y_max": corner_size,
-            "fill": "black",  # Step 10: Use black fill
-            "opacity": 0.05,  # Step 10: Use 0.05 opacity
-            "connectionId": conn_id
-        }
-        piece["faces"][face_name]["connectionAreas"].append(top_left_corner)
-        
-        # Top-right corner (B)
-        top_right_corner = {
-            "x_min": max_x - corner_size,
-            "x_max": max_x,
-            "y_min": 0.0,
-            "y_max": corner_size,
-            "fill": "black",  # Step 10: Use black fill
-            "opacity": 0.05,  # Step 10: Use 0.05 opacity
-            "connectionId": conn_id
-        }
-        piece["faces"][face_name]["connectionAreas"].append(top_right_corner)
-        
-        # Bottom-left corner (C)
-        bottom_left_corner = {
-            "x_min": 0.0,
-            "x_max": corner_size,
-            "y_min": max_y - corner_size,
             "y_max": max_y,
             "fill": "black",  # Step 10: Use black fill
             "opacity": 0.05,  # Step 10: Use 0.05 opacity
             "connectionId": conn_id
         }
-        piece["faces"][face_name]["connectionAreas"].append(bottom_left_corner)
+        piece["faces"][face_name]["connectionAreas"].append(left_stripe)
         
-        # Bottom-right corner (D)
-        bottom_right_corner = {
-            "x_min": max_x - corner_size,
+        # Right stripe
+        right_stripe = {
+            "x_min": max_x - stripe_width,
             "x_max": max_x,
-            "y_min": max_y - corner_size,
+            "y_min": 0.0,
             "y_max": max_y,
             "fill": "black",  # Step 10: Use black fill
             "opacity": 0.05,  # Step 10: Use 0.05 opacity
             "connectionId": conn_id
         }
-        piece["faces"][face_name]["connectionAreas"].append(bottom_right_corner)
+        piece["faces"][face_name]["connectionAreas"].append(right_stripe)
     
     elif face_name in ["left", "right"]:
         # For left/right faces: horizontal stripes
@@ -1215,123 +1212,6 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
             "connectionId": conn_id
         }
         piece["faces"][face_name]["connectionAreas"].append(bottom_stripe)
-
-# ============================================================================
-# STEP 5: FILTER HOLES BY CONNECTION AREAS
-# ============================================================================
-
-def filter_holes_by_connection_areas(pieces, connections):
-    """Step 5: Filter holes to keep only those within connection areas"""
-    print("Filtering holes by connection areas...")
-    
-    for piece in pieces:
-        for face_name, face in piece["faces"].items():
-            if not face["connectionAreas"]:
-                # No connection areas = no holes should remain
-                print(f"Removing all holes from {piece['name']} {face_name} (no connection areas)")
-                face["holes"] = []
-                continue
-            
-            # Get all connection areas for this face
-            conn_areas = face["connectionAreas"]
-            original_hole_count = len(face["holes"])
-            
-            # Filter holes to keep only those within connection areas
-            filtered_holes = []
-            for hole in face["holes"]:
-                hole_x, hole_y = hole["x"], hole["y"]
-                
-                # Check if hole is within ANY connection area
-                hole_in_conn_area = False
-                for area in conn_areas:
-                    if (area["x_min"] <= hole_x <= area["x_max"] and 
-                        area["y_min"] <= hole_y <= area["y_max"]):
-                        hole_in_conn_area = True
-                        # Assign the connectionId to the hole
-                        hole["connectionId"] = area["connectionId"]
-                        break
-                
-                if hole_in_conn_area:
-                    filtered_holes.append(hole)
-            
-            face["holes"] = filtered_holes
-            remaining_hole_count = len(filtered_holes)
-            print(f"{piece['name']} {face_name}: {original_hole_count} -> {remaining_hole_count} holes (kept {remaining_hole_count} within connection areas)")
-
-# ============================================================================
-# STEP 6: CREATE SUBJECTIVE HOLES
-# ============================================================================
-
-def create_subjective_holes_from_objective_holes(pieces, connections):
-    """Step 6: Create subjective holes paired with remaining objective holes"""
-    print("Creating subjective holes from objective holes...")
-    
-    for conn in connections:
-        piece1_name = pieces[conn['piece1']]['name']
-        piece2_name = pieces[conn['piece2']]['name']
-        face1 = conn['face1']
-        face2 = conn['face2']
-        conn_id = conn['id']
-        
-        # Get the pieces
-        piece1 = next(p for p in pieces if p['name'] == piece1_name)
-        piece2 = next(p for p in pieces if p['name'] == piece2_name)
-        
-        # Get objective holes from piece1 that have this connectionId
-        objective_holes = [h for h in piece1["faces"][face1]["holes"] if h.get("connectionId") == conn_id]
-        
-        print(f"Connection {conn_id}: {piece1_name} {face1} -> {piece2_name} {face2}")
-        print(f"  Found {len(objective_holes)} objective holes to pair")
-        
-        # Create subjective holes on piece2 for each objective hole
-        for obj_hole in objective_holes:
-            # Use the EXACT SAME coordinates as the objective hole
-            subj_x = obj_hole["x"]
-            subj_y = obj_hole["y"]
-            
-            # Check if a hole already exists at this position
-            hole_exists = any(
-                abs(h["x"] - subj_x) < 5.0 and abs(h["y"] - subj_y) < 5.0
-                for h in piece2["faces"][face2]["holes"]
-            )
-            
-            if hole_exists:
-                print(f"    Skipped hole at ({subj_x}, {subj_y}) - hole already exists")
-                continue
-            
-            # Validate coordinates are within piece2 limits
-            if face2 in ["main", "other_main"]:
-                max_x, max_y = piece2["length"], piece2["height"]
-            elif face2 in ["top", "bottom"]:
-                max_x, max_y = piece2["length"], piece2["thickness"]
-            else:  # left, right
-                max_x, max_y = piece2["thickness"], piece2["height"]
-            
-            if (0 <= subj_x <= max_x and 0 <= subj_y <= max_y):
-                # Classify the subjective hole
-                hole_type = classify_hole_type(subj_x, subj_y, piece2, face2)
-                
-                # Use same properties as objective hole
-                hardware = obj_hole.get("ferragemSymbols", ["glue"])[0]
-                depth = obj_hole.get("depth", 20)
-                diameter = obj_hole.get("diameter")
-                
-                # Create subjective hole with EXACT same coordinates
-                subj_hole = criar_hole(
-                    subj_x, subj_y, 
-                    hole_type, 
-                    piece2.get("template_thickness", 20), 
-                    hardware, 
-                    connection_id=conn_id,
-                    depth=depth,
-                    diameter=diameter
-                )
-                
-                # Add to piece2 face
-                piece2["faces"][face2]["holes"].append(subj_hole)
-                print(f"    Created subjective hole at ({subj_x}, {subj_y}) - {hole_type}")
-            else:
-                print(f"    Skipped hole at ({subj_x}, {subj_y}) - outside piece bounds")
 
 # ============================================================================
 # STEP 13: CLEAN UNCONNECTED HOLES
@@ -1479,7 +1359,7 @@ def processar_json_entrada(input_path, output_path):
     # ============================================================================
     # STEP 3: MAP PIECES IN 3D SPACE
     # ============================================================================
-
+    
     views = extrair_views_por_peca(data)
     pecas_3d = []
     
@@ -1503,10 +1383,10 @@ def processar_json_entrada(input_path, output_path):
     print(f"Using template thickness: {template_thickness}")
     
     # ============================================================================
-    # STEP 4: ALLOCATE ALL POSSIBLE OBJECTIVE HOLES
+    # STEP 4: ALLOCATE INITIAL OBJECTIVE HOLES
     # ============================================================================
     
-    # Add ALL possible systematic holes to all pieces (we'll filter later)
+    # Add systematic holes to all pieces (avoiding connection areas)
     for peca in pecas_3d:
         adicionar_holes_sistematicos(peca, template_thickness)
     
@@ -1519,39 +1399,32 @@ def processar_json_entrada(input_path, output_path):
     print(f"Found {len(connections)} connections")
     
     # ============================================================================
-    # STEP 12: ENSURE ALL PIECES HAVE CONNECTION AREAS (BEFORE MIRRORING)
+    # STEP 6: MAP HOLES BETWEEN CONNECTED PIECES
+    # ============================================================================
+    
+    # First pass: Map holes between connected pieces (assign connectionId to holes)
+    map_holes_between_pieces(pecas_3d, connections, template_thickness)
+    
+    # ============================================================================
+    # STEP 7: CREATE CONNECTION AREAS
+    # ============================================================================
+    
+    # Second pass: Create connection areas aligned with the holes that now have connectionId
+    create_aligned_connection_areas(pecas_3d, connections)
+    
+    # ============================================================================
+    # STEP 12: ENSURE ALL PIECES HAVE CONNECTION AREAS
     # ============================================================================
     
     # Ensure all pieces have at least one connection area
     ensure_all_pieces_have_connection_areas(pecas_3d, connections)
     
     # ============================================================================
-    # STEP 5.8: MIRROR LEG CONNECTION AREAS TO PANEL
+    # STEP 13: CLEAN UNCONNECTED HOLES
     # ============================================================================
     
-    # Mirror leg connection areas to top panel at exact same coordinates
-    mirror_leg_to_panel(pecas_3d, connections)
-    
-    # ============================================================================
-    # STEP 5.8: MIRROR CONNECTION AREAS AND HOLES
-    # ============================================================================
-    
-    # Mirror connection areas and holes from legs to top panel
-    mirror_connection_areas_and_holes(pecas_3d, connections)
-    
-    # ============================================================================
-    # STEP 5: FILTER HOLES BY CONNECTION AREAS
-    # ============================================================================
-    
-    # Filter holes to keep only those within connection areas
-    filter_holes_by_connection_areas(pecas_3d, connections)
-    
-    # ============================================================================
-    # STEP 6: CREATE SUBJECTIVE HOLES
-    # ============================================================================
-    
-    # Create subjective holes paired with remaining objective holes
-    create_subjective_holes_from_objective_holes(pecas_3d, connections)
+    # Clean unconnected holes (keep connected holes and systematic holes) 
+    clean_unconnected_holes(pecas_3d)
     
     # ============================================================================
     # STEP 15: ADD SINGER REINFORCEMENT HOLES
@@ -1581,7 +1454,7 @@ def processar_json_entrada(input_path, output_path):
     # ============================================================================
     # STEP 17: STRUCTURE FINAL JSON
     # ============================================================================
-
+    
     # Build output JSON
     output = {"pieces": []}
     for p in pecas_3d:
@@ -1610,145 +1483,6 @@ def processar_json_entrada(input_path, output_path):
         json.dump(output, f, indent=2, ensure_ascii=False)
     
     print(f"Output written to {output_path}")
-
-def mirror_connection_areas_and_holes(pieces, connections):
-    """Step 5.8: Mirror connection areas and holes from legs to top panel"""
-    print("Mirroring connection areas and holes from legs to top panel...")
-    
-    for conn in connections:
-        piece1_name = pieces[conn['piece1']]['name']
-        piece2_name = pieces[conn['piece2']]['name']
-        face1 = conn['face1']
-        face2 = conn['face2']
-        conn_id = conn['id']
-        
-        # Get the pieces
-        piece1 = next(p for p in pieces if p['name'] == piece1_name)
-        piece2 = next(p for p in pieces if p['name'] == piece2_name)
-        
-        print(f"Connection {conn_id}: Mirroring from {piece1_name} {face1} to {piece2_name} {face2}")
-        
-        # Clear existing connection areas and holes on the target face
-        piece2["faces"][face2]["connectionAreas"] = []
-        piece2["faces"][face2]["holes"] = []
-        
-        # Mirror connection areas from leg to panel
-        leg_connection_areas = piece1["faces"][face1]["connectionAreas"]
-        for leg_area in leg_connection_areas:
-            if leg_area.get("connectionId") == conn_id:
-                # Mirror the connection area - same x coordinates, adjust y for panel
-                mirrored_area = {
-                    "x_min": leg_area["x_min"],
-                    "x_max": leg_area["x_max"],
-                    "y_min": 0.0,  # Top edge of panel
-                    "y_max": piece2["thickness"],  # Height = panel thickness
-                    "fill": "black",
-                    "opacity": 0.05,
-                    "connectionId": conn_id
-                }
-                piece2["faces"][face2]["connectionAreas"].append(mirrored_area)
-                print(f"  Mirrored connection area: ({leg_area['x_min']}, {leg_area['y_min']}) -> ({mirrored_area['x_min']}, {mirrored_area['y_min']})")
-        
-        # Mirror holes from leg to panel
-        leg_holes = piece1["faces"][face1]["holes"]
-        for leg_hole in leg_holes:
-            if leg_hole.get("connectionId") == conn_id:
-                # Mirror the hole - same x coordinate, adjust y for panel
-                mirrored_hole = {
-                    "x": leg_hole["x"],
-                    "y": 10.0,  # Top edge of panel
-                    "type": "flap_corner",
-                    "targetType": "20",
-                    "ferragemSymbols": leg_hole["ferragemSymbols"],
-                    "connectionId": conn_id,
-                    "depth": leg_hole["depth"]
-                }
-                piece2["faces"][face2]["holes"].append(mirrored_hole)
-                print(f"  Mirrored hole: ({leg_hole['x']}, {leg_hole['y']}) -> ({mirrored_hole['x']}, {mirrored_hole['y']})")
-
-def mirror_leg_to_panel(pieces, connections):
-    """Mirror leg connection areas to top panel at exact same coordinates"""
-    print("Mirroring leg connection areas to top panel...")
-    
-    for conn in connections:
-        piece1_name = pieces[conn['piece1']]['name']
-        piece2_name = pieces[conn['piece2']]['name']
-        face1 = conn['face1']
-        face2 = conn['face2']
-        conn_id = conn['id']
-        
-        # Find leg and panel pieces
-        leg_piece = None
-        panel_piece = None
-        leg_face = None
-        panel_face = None
-        
-        if "perna" in piece1_name.lower():
-            leg_piece = pieces[conn['piece1']]
-            panel_piece = pieces[conn['piece2']]
-            leg_face = face1
-            panel_face = face2
-        elif "perna" in piece2_name.lower():
-            leg_piece = pieces[conn['piece2']]
-            panel_piece = pieces[conn['piece1']]
-            leg_face = face2
-            panel_face = face1
-        
-        if leg_piece and panel_piece:
-            print(f"Mirroring from {leg_piece['name']} {leg_face} to {panel_piece['name']} {panel_face}")
-            
-            # Clear existing connection areas and holes on panel face
-            panel_piece["faces"][panel_face]["connectionAreas"] = []
-            panel_piece["faces"][panel_face]["holes"] = []
-            
-            # Get leg's connection areas
-            leg_connection_areas = leg_piece["faces"][leg_face]["connectionAreas"]
-            print(f"  Leg has {len(leg_connection_areas)} connection areas")
-            
-            # Mirror each connection area from leg to panel
-            for leg_area in leg_connection_areas:
-                print(f"    Checking leg area: {leg_area}")
-                if leg_area.get("connectionId") == conn_id:
-                    # Mirror with SAME x-coordinates, adjust y for panel
-                    mirrored_area = {
-                        "x_min": leg_area["x_min"],  # Same x
-                        "x_max": leg_area["x_max"],  # Same x
-                        "y_min": 0.0,  # Top edge of panel
-                        "y_max": 19.9,  # Same height as leg (19.9mm)
-                        "fill": "black",
-                        "opacity": 0.05,
-                        "connectionId": conn_id
-                    }
-                    panel_piece["faces"][panel_face]["connectionAreas"].append(mirrored_area)
-                    print(f"  Mirrored area: x({leg_area['x_min']}-{leg_area['x_max']}) y(0.0-19.9)")
-                else:
-                    print(f"    Skipped area with connectionId {leg_area.get('connectionId')} (need {conn_id})")
-            
-            # Get leg's holes
-            leg_holes = leg_piece["faces"][leg_face]["holes"]
-            
-            # Mirror each hole from leg to panel  
-            for leg_hole in leg_holes:
-                if leg_hole.get("connectionId") == conn_id:
-                    # Mirror with SAME x-coordinate, y=10 for panel
-                    mirrored_hole = {
-                        "x": leg_hole["x"],  # Same x position
-                        "y": 10.0,  # Fixed y position on panel
-                        "type": leg_hole["type"],
-                        "targetType": leg_hole["targetType"],
-                        "ferragemSymbols": leg_hole["ferragemSymbols"],
-                        "connectionId": conn_id,
-                        "depth": leg_hole["depth"]
-                    }
-                    panel_piece["faces"][panel_face]["holes"].append(mirrored_hole)
-                    print(f"  Mirrored hole: ({leg_hole['x']}, {leg_hole['y']}) -> ({mirrored_hole['x']}, {mirrored_hole['y']})")
-
-    # ============================================================================
-    # STEP 5.8: MIRROR LEG CONNECTION AREAS TO PANEL  
-    # ============================================================================
-   
-    
-    # OLD: mirror_connection_areas_and_holes(pecas_3d, connections)
 
 # ============================================================================
 # MAIN EXECUTION

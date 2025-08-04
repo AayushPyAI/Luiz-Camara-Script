@@ -309,17 +309,6 @@
           "faceSide": "bottom",
           "holes": [
             {
-              "x": 10.0,
-              "y": 10.0,
-              "type": "top_corner",
-              "targetType": "20",
-              "ferragemSymbols": [
-                "glue"
-              ],
-              "depth": 20,
-              "connectionId": 1
-            },
-            {
               "x": 190.0,
               "y": 10.0,
               "type": "top_corner",
@@ -327,11 +316,72 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "depth": 20,
-              "connectionId": 1
+              "depth": 20
+            },
+            {
+              "x": 25.9,
+              "y": 160.7,
+              "type": "face_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 1,
+              "depth": 20
+            },
+            {
+              "x": 186.0,
+              "y": 160.7,
+              "type": "face_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 1,
+              "depth": 20
+            },
+            {
+              "x": 33.8,
+              "y": 160.7,
+              "type": "face_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 1,
+              "depth": 20
+            },
+            {
+              "x": 194.0,
+              "y": 160.7,
+              "type": "face_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "glue"
+              ],
+              "connectionId": 1,
+              "depth": 20
             }
           ],
           "connectionAreas": [
+            {
+              "x_min": 19.9,
+              "x_max": 39.8,
+              "y_min": 0.0,
+              "y_max": 200.933,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            },
+            {
+              "x_min": 180.1,
+              "x_max": 200.0,
+              "y_min": 0.0,
+              "y_max": 200.933,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            },
             {
               "x_min": 19.9,
               "x_max": 39.8,

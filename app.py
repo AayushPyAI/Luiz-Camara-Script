@@ -775,68 +775,78 @@ def map_face_holes_proximity(p1, p2, face1, face2, conn_id, template_thickness):
 # ============================================================================
 
 def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id, template_thickness):
-    """Step 10: Map specific leg hole positions to corresponding positions on top panel"""
+    """Step 10: Map specific leg hole positions to corresponding positions on top panel with mirroring"""
     
     # Get the systematic holes from the leg face
     leg_holes = leg_piece["faces"][leg_face]["holes"]
     print(f"DEBUG: Found {len(leg_holes)} holes on {leg_piece['name']} {leg_face} face")
     
-    # Step 6: "Map the corresponding face of the primary piece on the secondary piece"
-    # Step 6: "Allocate subjective holes paired with objective holes already existing on other pieces"
+    # Find all connection areas on the top face for mirroring holes
+    connection_areas = top_piece["faces"][top_face]["connectionAreas"]
+    if not connection_areas:
+        print(f"DEBUG: No connection areas found on {top_piece['name']} {top_face} face")
+        return
+    
+    # Map each leg hole to positions within each connection area
     for leg_hole in leg_holes:
         print(f"DEBUG: Processing hole at ({leg_hole['x']}, {leg_hole['y']}) on {leg_piece['name']}")
-        # Transform coordinates from leg to top panel
-        top_x, top_y = transform_leg_to_top_coordinates(leg_piece, top_piece, leg_face, top_face, leg_hole["x"], leg_hole["y"], conn_id)
         
-        if top_x is not None and top_y is not None:
-            # Step 6: "Ensure perfect alignment with the primary hole of the other piece"
-            # Step 6: "Validate and classify mapped holes"
+        # Create mirrored holes in each connection area
+        for area in connection_areas:
+            # Calculate hole position within this connection area
+            area_center_x = (area["x_min"] + area["x_max"]) / 2
+            area_center_y = (area["y_min"] + area["y_max"]) / 2
             
-            # Validate coordinates are within piece limits
-            print(f"DEBUG: Checking coordinates ({top_x}, {top_y}) for piece limits length={top_piece['length']}, thickness={top_piece['thickness']}")
-            if (0 <= top_x <= top_piece["length"] and 0 <= top_y <= top_piece["thickness"]):
-                
-                # Step 6: "Classify holes based on position"
-                hole_type = classify_hole_type(top_x, top_y, top_piece, top_face)
-                
-                # Step 6: "Ensure perfect alignment with the primary hole of the other piece"
-                # Use the same hardware and properties as the leg hole
-                hardware = leg_hole.get("ferragemSymbols", ["glue"])[0]
-                depth = leg_hole.get("depth", 20)
-                diameter = leg_hole.get("diameter")
-                
-                # Check if hole already exists at this position to prevent duplicates
-                existing_holes = top_piece["faces"][top_face]["holes"]
-                hole_exists = any(
-                    abs(existing["x"] - top_x) < 5.0 and abs(existing["y"] - top_y) < 5.0
-                    for existing in existing_holes
+            # Place holes at appropriate positions within the connection area
+            # Use relative position from leg hole to determine placement
+            if leg_hole["x"] <= leg_piece["length"] / 2:
+                # Left side hole on leg -> place closer to left edge of connection area
+                hole_x = area["x_min"] + (area["x_max"] - area["x_min"]) * 0.3
+            else:
+                # Right side hole on leg -> place closer to right edge of connection area  
+                hole_x = area["x_min"] + (area["x_max"] - area["x_min"]) * 0.7
+            
+            if leg_hole["y"] <= leg_piece["thickness"] / 2:
+                # Front hole on leg -> place closer to front of connection area
+                hole_y = area["y_min"] + (area["y_max"] - area["y_min"]) * 0.2
+            else:
+                # Back hole on leg -> place closer to back of connection area
+                hole_y = area["y_min"] + (area["y_max"] - area["y_min"]) * 0.8
+            
+            # Ensure hole is within piece and connection area bounds
+            hole_x = max(area["x_min"] + 2, min(area["x_max"] - 2, hole_x))
+            hole_y = max(area["y_min"] + 2, min(area["y_max"] - 2, hole_y))
+            
+            # Classify hole type based on new position
+            hole_type = classify_hole_type(hole_x, hole_y, top_piece, top_face)
+            
+            # Use the same hardware and properties as the leg hole
+            hardware = leg_hole.get("ferragemSymbols", ["glue"])[0]
+            depth = leg_hole.get("depth", 20)
+            diameter = leg_hole.get("diameter")
+            
+            # Check if hole already exists at this position
+            existing_holes = top_piece["faces"][top_face]["holes"]
+            hole_exists = any(
+                abs(existing["x"] - hole_x) < 5.0 and abs(existing["y"] - hole_y) < 5.0
+                for existing in existing_holes
+            )
+            
+            if not hole_exists:
+                # Create the mirrored hole with connection area's connectionId
+                mapped_hole = criar_hole(
+                    hole_x, hole_y, 
+                    hole_type, 
+                    template_thickness, 
+                    hardware, 
+                    connection_id=area["connectionId"],
+                    depth=depth,
+                    diameter=diameter
                 )
                 
-                if not hole_exists:
-                    # Create the mapped hole with connectionId
-                    mapped_hole = criar_hole(
-                        top_x, top_y, 
-                        hole_type, 
-                        template_thickness, 
-                        hardware, 
-                        connection_id=conn_id,
-                        depth=depth,
-                        diameter=diameter
-                    )
-                    
-                    # Add to top panel face
-                    top_piece["faces"][top_face]["holes"].append(mapped_hole)
-                    print(f"Mapped hole from {leg_piece['name']} {leg_face} to {top_piece['name']} {top_face}: ({top_x}, {top_y}) - {hole_type}")
-                else:
-                    # Update existing hole with connectionId if it doesn't have one
-                    for existing_hole in existing_holes:
-                        if abs(existing_hole["x"] - top_x) < 5.0 and abs(existing_hole["y"] - top_y) < 5.0:
-                            if "connectionId" not in existing_hole:
-                                existing_hole["connectionId"] = conn_id
-                                print(f"Updated existing hole with connectionId: ({top_x}, {top_y}) - {hole_type}")
-                            break
-            else:
-                print(f"DEBUG: Coordinates ({top_x}, {top_y}) are outside piece limits!")
+                # Add to top panel face
+                top_piece["faces"][top_face]["holes"].append(mapped_hole)
+                print(f"Mirrored hole from {leg_piece['name']} to {top_piece['name']} {top_face}: ({hole_x:.1f}, {hole_y:.1f}) - {hole_type} in connection area {area['connectionId']}")
 
 def transform_leg_to_top_coordinates(leg_piece, top_piece, leg_face, top_face, leg_x, leg_y, conn_id):
     """Step 10: Transform coordinates from leg coordinate system to top panel coordinate system"""
@@ -1229,18 +1239,38 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
         piece["faces"][face_name]["connectionAreas"].append(bottom_stripe)
 
 # ============================================================================
-# STEP 13: CLEAN UNCONNECTED HOLES
+# STEP 13: CLEAN HOLES OUTSIDE CONNECTION AREAS
 # ============================================================================
 
-def clean_unconnected_holes(pieces):
-    """Step 13: Remove only singer holes that aren't needed - keep systematic and connected holes"""
+def clean_holes_outside_connection_areas(pieces):
+    """Step 13: Remove holes that are outside connection areas and clean unconnected holes"""
     for piece in pieces:
         for face_name, face in piece["faces"].items():
-            # Keep holes that have connectionId (connected/subjective holes) OR are systematic holes (corner, central, etc.)
-            # Remove only singer holes that aren't connected
-            face["holes"] = [hole for hole in face["holes"] 
-                           if "connectionId" in hole or 
-                              hole["type"] in ["flap_corner", "flap_central", "top_corner", "top_central", "face_central"]]
+            connection_areas = face["connectionAreas"]
+            cleaned_holes = []
+            
+            for hole in face["holes"]:
+                # Check if hole is inside any connection area OR is a systematic hole
+                is_inside_connection_area = False
+                is_systematic_hole = hole["type"] in ["flap_corner", "flap_central", "top_corner", "top_central", "face_central"]
+                
+                # Check if hole is within any connection area
+                for area in connection_areas:
+                    if (area["x_min"] <= hole["x"] <= area["x_max"] and 
+                        area["y_min"] <= hole["y"] <= area["y_max"]):
+                        is_inside_connection_area = True
+                        break
+                
+                # Keep hole if it's inside a connection area OR it's a systematic hole AND has connectionId
+                if is_inside_connection_area or (is_systematic_hole and "connectionId" in hole):
+                    cleaned_holes.append(hole)
+                elif is_systematic_hole and not connection_areas:
+                    # Keep systematic holes on faces without connection areas
+                    cleaned_holes.append(hole)
+                else:
+                    print(f"DEBUG: Removing hole at ({hole['x']}, {hole['y']}) on {piece['name']} {face_name} - outside connection areas")
+            
+            face["holes"] = cleaned_holes
 
 # ============================================================================
 # STEP 14: ENSURE ALL PIECES HAVE FACES WITH SINGER HOLES
@@ -1414,17 +1444,10 @@ def processar_json_entrada(input_path, output_path):
     print(f"Found {len(connections)} connections")
     
     # ============================================================================
-    # STEP 6: MAP HOLES BETWEEN CONNECTED PIECES
+    # STEP 7: CREATE CONNECTION AREAS FIRST
     # ============================================================================
     
-    # First pass: Map holes between connected pieces (assign connectionId to holes)
-    map_holes_between_pieces(pecas_3d, connections, template_thickness)
-    
-    # ============================================================================
-    # STEP 7: CREATE CONNECTION AREAS
-    # ============================================================================
-    
-    # Second pass: Create connection areas aligned with the holes that now have connectionId
+    # First pass: Create connection areas so we know where to place holes
     create_aligned_connection_areas(pecas_3d, connections)
     
     # ============================================================================
@@ -1435,11 +1458,18 @@ def processar_json_entrada(input_path, output_path):
     ensure_all_pieces_have_connection_areas(pecas_3d, connections)
     
     # ============================================================================
-    # STEP 13: CLEAN UNCONNECTED HOLES
+    # STEP 6: MAP HOLES BETWEEN CONNECTED PIECES
     # ============================================================================
     
-    # Clean unconnected holes (keep connected holes and systematic holes) 
-    clean_unconnected_holes(pecas_3d)
+    # Second pass: Map holes between connected pieces inside connection areas
+    map_holes_between_pieces(pecas_3d, connections, template_thickness)
+    
+    # ============================================================================
+    # STEP 13: CLEAN HOLES OUTSIDE CONNECTION AREAS
+    # ============================================================================
+    
+    # Clean holes outside connection areas and unconnected holes
+    clean_holes_outside_connection_areas(pecas_3d)
     
     # ============================================================================
     # STEP 15: ADD SINGER REINFORCEMENT HOLES

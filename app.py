@@ -989,66 +989,14 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
                 "connectionId": conn_id
             })
         else:
-            # For tampo bottom face: Create rectangles around actual hole positions
-            # Find the holes on this face to position connection areas around them
+            # For tampo bottom face: Skip creating rectangles around hole positions
+            # Only vertical stripes will be created by ensure_all_pieces_have_connection_areas
             if face_holes:
-                # Group holes by their x-coordinate to create connection areas
-                hole_groups = {}
-                for hole in face_holes:
-                    x_key = round(hole["x"] / 50) * 50  # Group holes within 50mm
-                    if x_key not in hole_groups:
-                        hole_groups[x_key] = []
-                    hole_groups[x_key].append(hole)
-                
-                # Create a connection area for each group of holes
-                area_width = 40.0  # Connection area width around holes
-                area_height = 40.0  # Connection area height around holes
-                
-                for group_x, holes_in_group in hole_groups.items():
-                    # Calculate center position from holes in this group
-                    avg_x = sum(h["x"] for h in holes_in_group) / len(holes_in_group)
-                    avg_y = sum(h["y"] for h in holes_in_group) / len(holes_in_group)
-                    
-                    # Create connection area centered on the holes
-                    connection_area = {
-                        "x_min": max(0, avg_x - area_width/2),
-                        "x_max": min(max_x, avg_x + area_width/2),
-                        "y_min": max(0, avg_y - area_height/2),
-                        "y_max": min(max_y, avg_y + area_height/2),
-                        "fill": "black",
-                        "opacity": 0.05,
-                        "connectionId": conn_id
-                    }
-                    piece["faces"][face_name]["connectionAreas"].append(connection_area)
+                # Don't create connection areas around holes - user doesn't want squares
+                pass
             else:
-                # Fallback: create areas based on expected hole positions (ft, ft) and (length-ft, ft)
-                ft = piece["half_thickness"]
-                area_width = 40.0
-                area_height = 40.0
-                
-                # Left connection area
-                left_area = {
-                    "x_min": max(0, ft - area_width/2),
-                    "x_max": min(max_x, ft + area_width/2),
-                    "y_min": max(0, ft - area_height/2),
-                    "y_max": min(max_y, ft + area_height/2),
-                    "fill": "black",
-                    "opacity": 0.05,
-                    "connectionId": conn_id
-                }
-                piece["faces"][face_name]["connectionAreas"].append(left_area)
-                
-                # Right connection area
-                right_area = {
-                    "x_min": max(0, (max_x - ft) - area_width/2),
-                    "x_max": min(max_x, (max_x - ft) + area_width/2),
-                    "y_min": max(0, ft - area_height/2),
-                    "y_max": min(max_y, ft + area_height/2),
-                    "fill": "black",
-                    "opacity": 0.05,
-                    "connectionId": conn_id
-                }
-                piece["faces"][face_name]["connectionAreas"].append(right_area)
+                # No fallback squares - only vertical stripes will be created by ensure_all_pieces_have_connection_areas
+                pass
     
     elif face_name in ["main", "other_main"]:
         # For main faces: vertical stripes on edges

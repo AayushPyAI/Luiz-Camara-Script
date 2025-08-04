@@ -102,8 +102,8 @@
           "holes": [
             {
               "x": 30.0,
-              "y": 50.0,
-              "type": "face_central",
+              "y": 10.0,
+              "type": "flap_central",
               "targetType": "20",
               "ferragemSymbols": [
                 "glue"
@@ -113,8 +113,8 @@
             },
             {
               "x": 190.0,
-              "y": 50.0,
-              "type": "flap_central",
+              "y": 10.0,
+              "type": "flap_corner",
               "targetType": "20",
               "ferragemSymbols": [
                 "glue"
@@ -124,24 +124,24 @@
             },
             {
               "x": 30.0,
-              "y": 150.0,
+              "y": 190.0,
               "type": "face_central",
               "targetType": "20",
               "ferragemSymbols": [
                 "glue"
               ],
-              "connectionId": 1,
+              "connectionId": 2,
               "depth": 20
             },
             {
               "x": 190.0,
-              "y": 150.0,
+              "y": 190.0,
               "type": "flap_central",
               "targetType": "20",
               "ferragemSymbols": [
                 "glue"
               ],
-              "connectionId": 1,
+              "connectionId": 2,
               "depth": 20
             }
           ],

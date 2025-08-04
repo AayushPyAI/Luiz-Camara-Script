@@ -816,22 +816,16 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
     # Create exactly 4 holes (2 per leg) with fixed positioning within connection areas
     # Based on client's image, holes should be at specific Y positions within the connection areas
     
-    # Define fixed Y positions for holes within the 0-200 connection area range
-    if conn_id == 1:
-        # First leg holes: position in upper third of connection areas
-        hole_y = 50  # Fixed Y position for first leg
-    else:
-        # Second leg holes: position in lower third of connection areas  
-        hole_y = 150  # Fixed Y position for second leg
-    
     # Create holes for each leg hole mapped to appropriate connection areas
+    # Use same relative positioning logic for both X and Y axes
     for leg_hole in leg_holes:
         print(f"DEBUG: Processing hole at ({leg_hole['x']}, {leg_hole['y']}) on {leg_piece['name']}")
         
-        # Determine which connection area based on leg hole X position
-        leg_rel_x = leg_hole["x"] / leg_piece["length"]
+        # Calculate relative positions of the leg hole
+        leg_rel_x = leg_hole["x"] / leg_piece["length"]  # Relative X position (0.0 to 1.0)
+        leg_rel_y = leg_hole["y"] / leg_piece["thickness"]  # Relative Y position (0.0 to 1.0)
         
-        # Find appropriate connection area (left or right)
+        # Find appropriate connection area (left or right) based on leg hole X position
         target_area = None
         for area in connection_areas:
             area_center_x = (area["x_min"] + area["x_max"]) / 2
@@ -845,8 +839,17 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
                 break
         
         if target_area:
-            # Center hole within connection area width, use fixed Y position
+            # Map both X and Y using relative positioning
+            # X: Center hole within connection area width
             hole_x = target_area["x_min"] + (target_area["x_max"] - target_area["x_min"]) / 2
+            
+            # Y: Direct mapping to specific Y coordinates to pair with leg holes
+            if conn_id == 1:
+                # First leg holes: map to Y=10 to pair with leg holes
+                hole_y = 10.0
+            else:
+                # Second leg holes: map to Y=190 to pair with leg holes
+                hole_y = 190.0
             
             # Classify hole type
             hole_type = classify_hole_type(hole_x, hole_y, top_piece, top_face)
@@ -856,17 +859,17 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
             depth = leg_hole.get("depth", 20)
             diameter = leg_hole.get("diameter")
             
-            # Create mapped hole
+            # Create mapped hole with correct connection ID based on which leg it comes from
             mapped_hole = criar_hole(
-                hole_x, hole_y,
-                hole_type,
-                template_thickness,
-                hardware,
-                connection_id=1,  # Use consistent connection ID
-                depth=depth,
-                diameter=diameter
-            )
-            
+                    hole_x, hole_y, 
+                    hole_type, 
+                    template_thickness, 
+                    hardware, 
+                connection_id=conn_id,  # Use the actual connection ID for this leg
+                    depth=depth,
+                    diameter=diameter
+                )
+                
             # Add to top panel face
             top_piece["faces"][top_face]["holes"].append(mapped_hole)
             print(f"Created mapped hole: {leg_piece['name']} -> ({hole_x:.1f}, {hole_y:.1f}) in area {target_area['connectionId']}")

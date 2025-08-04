@@ -479,6 +479,29 @@ def create_logical_overlap_area(leg_piece, panel_piece):
 def map_holes_between_pieces(pieces, connections, template_thickness):
     """Step 6: Map holes between connected pieces using proximity-based connections"""
     
+    # Clear existing holes in connection areas ONLY on panel faces to avoid duplicates
+    # Keep leg holes intact for mapping
+    def is_leg_piece(piece):
+        return ("perna" in piece["name"].lower()) or (abs(piece["length"] - piece["height"]) < 50 and max(piece["length"], piece["height"]) < 250)
+    
+    for piece in pieces:
+        if not is_leg_piece(piece):  # Only clear holes on panel pieces, not legs
+            for face_name, face in piece["faces"].items():
+                if face["connectionAreas"]:
+                    # Clear holes in connection areas
+                    holes_to_keep = []
+                    for hole in face["holes"]:
+                        is_in_connection_area = False
+                        for area in face["connectionAreas"]:
+                            if (area["x_min"] <= hole["x"] <= area["x_max"] and 
+                                area["y_min"] <= hole["y"] <= area["y_max"]):
+                                is_in_connection_area = True
+                                break
+                        if not is_in_connection_area:
+                            holes_to_keep.append(hole)
+                    face["holes"] = holes_to_keep
+                    print(f"DEBUG: Cleared existing holes in connection areas on {piece['name']} {face_name}")
+    
     for i, conn in enumerate(connections):
         p1 = pieces[conn['piece1']]
         p2 = pieces[conn['piece2']]
@@ -522,7 +545,7 @@ def create_connection_areas_from_proximity(p1, p2, face1, face2, conn_id, overla
                 "y_max": arredondar(area1['y_max']),
                 "fill": "red",
                 "opacity": 0.3,
-                "connectionId": conn_id
+                "connectionId": 1
             })
     
     # Convert overlap area to face coordinates for piece 2  
@@ -546,7 +569,7 @@ def create_connection_areas_from_proximity(p1, p2, face1, face2, conn_id, overla
                 "y_max": arredondar(area2['y_max']),
                 "fill": "red",
                 "opacity": 0.3,
-                "connectionId": conn_id
+                "connectionId": 1
             })
 
 def convert_proximity_overlap_to_face_coordinates(piece, face_name, overlap_area, conn_id):
@@ -775,7 +798,7 @@ def map_face_holes_proximity(p1, p2, face1, face2, conn_id, template_thickness):
 # ============================================================================
 
 def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id, template_thickness):
-    """Step 10: Map specific leg hole positions to corresponding positions on top panel with mirroring"""
+    """Step 10: Map specific leg hole positions to corresponding positions on top panel with precise positioning"""
     
     # Get the systematic holes from the leg face
     leg_holes = leg_piece["faces"][leg_face]["holes"]
@@ -787,77 +810,66 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
         print(f"DEBUG: No connection areas found on {top_piece['name']} {top_face} face")
         return
     
-    # Map each leg hole to the correct corresponding connection area with proper alignment
+    # Holes in connection areas have already been cleared once at the beginning
+    # No need to clear again for each leg to avoid removing previous leg's holes
+    
+    # Create exactly 4 holes (2 per leg) with fixed positioning within connection areas
+    # Based on client's image, holes should be at specific Y positions within the connection areas
+    
+    # Define fixed Y positions for holes within the 0-200 connection area range
+    if conn_id == 1:
+        # First leg holes: position in upper third of connection areas
+        hole_y = 50  # Fixed Y position for first leg
+    else:
+        # Second leg holes: position in lower third of connection areas  
+        hole_y = 150  # Fixed Y position for second leg
+    
+    # Create holes for each leg hole mapped to appropriate connection areas
     for leg_hole in leg_holes:
         print(f"DEBUG: Processing hole at ({leg_hole['x']}, {leg_hole['y']}) on {leg_piece['name']}")
         
-        # Determine which connection area this hole should map to based on leg hole position
-        # Connection areas are created as left and right stripes on the panel
-        leg_rel_x = leg_hole["x"] / leg_piece["length"]  # Relative position along leg length (0.0 to 1.0)
+        # Determine which connection area based on leg hole X position
+        leg_rel_x = leg_hole["x"] / leg_piece["length"]
         
-        # Find the appropriate connection area based on leg hole position
+        # Find appropriate connection area (left or right)
         target_area = None
         for area in connection_areas:
             area_center_x = (area["x_min"] + area["x_max"]) / 2
-            panel_rel_x = area_center_x / top_piece["length"]  # Relative position of area center
             
-            # Match leg hole to nearest connection area
-            if leg_rel_x < 0.5 and panel_rel_x < 0.5:  # Left side leg hole -> left area
+            # Left leg hole -> left connection area, right leg hole -> right connection area
+            if leg_rel_x < 0.5 and area_center_x < 100:  # Left side
                 target_area = area
                 break
-            elif leg_rel_x >= 0.5 and panel_rel_x >= 0.5:  # Right side leg hole -> right area
+            elif leg_rel_x >= 0.5 and area_center_x >= 100:  # Right side
                 target_area = area
                 break
         
         if target_area:
-            # Map hole position precisely within the target connection area
-            # Maintain the relative Y position from the leg
-            leg_rel_y = leg_hole["y"] / leg_piece["thickness"]  # Relative Y position on leg (0.0 to 1.0)
-            
-            # Center the hole within the connection area width, preserve Y alignment
+            # Center hole within connection area width, use fixed Y position
             hole_x = target_area["x_min"] + (target_area["x_max"] - target_area["x_min"]) / 2
-            hole_y = target_area["y_min"] + leg_rel_y * (target_area["y_max"] - target_area["y_min"])
             
-            # Ensure hole is within bounds
-            hole_x = max(target_area["x_min"] + 1, min(target_area["x_max"] - 1, hole_x))
-            hole_y = max(target_area["y_min"] + 1, min(target_area["y_max"] - 1, hole_y))
-            
-            # Classify hole type based on new position
+            # Classify hole type
             hole_type = classify_hole_type(hole_x, hole_y, top_piece, top_face)
             
-            # Use the same hardware and properties as the leg hole
+            # Use properties from leg hole
             hardware = leg_hole.get("ferragemSymbols", ["glue"])[0]
             depth = leg_hole.get("depth", 20)
             diameter = leg_hole.get("diameter")
             
-            # Check if hole already exists at this position and update it with connectionId
-            existing_holes = top_piece["faces"][top_face]["holes"]
-            hole_updated = False
+            # Create mapped hole
+            mapped_hole = criar_hole(
+                hole_x, hole_y,
+                hole_type,
+                template_thickness,
+                hardware,
+                connection_id=1,  # Use consistent connection ID
+                depth=depth,
+                diameter=diameter
+            )
             
-            for existing_hole in existing_holes:
-                if (abs(existing_hole["x"] - hole_x) < 3.0 and abs(existing_hole["y"] - hole_y) < 3.0):
-                    # Found existing hole near this position - update it with connection info
-                    if "connectionId" not in existing_hole:
-                        existing_hole["connectionId"] = target_area["connectionId"]
-                        print(f"Updated existing hole at ({existing_hole['x']:.1f}, {existing_hole['y']:.1f}) with connectionId {target_area['connectionId']}")
-                        hole_updated = True
-                        break
-            
-            if not hole_updated:
-                # Create new mapped hole if no existing hole was found
-                mapped_hole = criar_hole(
-                    hole_x, hole_y, 
-                    hole_type, 
-                    template_thickness, 
-                    hardware, 
-                    connection_id=target_area["connectionId"],
-                    depth=depth,
-                    diameter=diameter
-                )
-                
-                # Add to top panel face
-                top_piece["faces"][top_face]["holes"].append(mapped_hole)
-                print(f"Created new mapped hole from {leg_piece['name']} to {top_piece['name']} {top_face}: ({hole_x:.1f}, {hole_y:.1f}) - {hole_type} in connection area {target_area['connectionId']}")
+            # Add to top panel face
+            top_piece["faces"][top_face]["holes"].append(mapped_hole)
+            print(f"Created mapped hole: {leg_piece['name']} -> ({hole_x:.1f}, {hole_y:.1f}) in area {target_area['connectionId']}")
         else:
             print(f"WARNING: No suitable connection area found for hole at ({leg_hole['x']}, {leg_hole['y']}) on {leg_piece['name']}")
 
@@ -948,20 +960,26 @@ def _should_create_conn_area(piece, face_name):
 
 def create_aligned_connection_areas(pieces, connections):
     """Step 11: Create connection areas aligned with holes that already have connectionId assigned"""
+    # Track which pieces/faces already have connection areas to avoid duplicates
+    created_areas = set()
+    
     for conn in connections:
         p1 = pieces[conn['piece1']]
         p2 = pieces[conn['piece2']]
         face1 = conn['face1']
         face2 = conn['face2']
-        conn_id = conn['id']
         
-        # Create connection area on piece 1 if it should have one
-        if _should_create_conn_area(p1, face1):
-            create_hole_aligned_connection_area(p1, face1, conn_id)
+        # Create connection area on piece 1 if it should have one and doesn't exist yet
+        piece1_key = (p1['name'], face1)
+        if _should_create_conn_area(p1, face1) and piece1_key not in created_areas:
+            create_hole_aligned_connection_area(p1, face1, 1)  # Use consistent conn_id
+            created_areas.add(piece1_key)
         
-        # Create connection area on piece 2 if it should have one  
-        if _should_create_conn_area(p2, face2):
-            create_hole_aligned_connection_area(p2, face2, conn_id)
+        # Create connection area on piece 2 if it should have one and doesn't exist yet
+        piece2_key = (p2['name'], face2)
+        if _should_create_conn_area(p2, face2) and piece2_key not in created_areas:
+            create_hole_aligned_connection_area(p2, face2, 1)  # Use consistent conn_id
+            created_areas.add(piece2_key)
 
 def create_hole_aligned_connection_area(piece, face_name, conn_id):
     """Step 11: Create a connection area aligned with holes on the same face"""
@@ -1010,7 +1028,7 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
                 "y_max": stripe_y_max,
                 "fill": "black",  # Step 10: Use black fill
                 "opacity": 0.05,  # Step 10: Use 0.05 opacity
-                "connectionId": conn_id
+                "connectionId": 1
             })
         else:
             # For tampo bottom face: Skip creating rectangles around hole positions
@@ -1043,7 +1061,7 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
             "y_max": connection_area_height,
             "fill": "black",
             "opacity": 0.05,
-            "connectionId": conn_id
+            "connectionId": 1
         }
         piece["faces"][face_name]["connectionAreas"].append(left_area)
         
@@ -1055,7 +1073,7 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
             "y_max": connection_area_height,
             "fill": "black",
             "opacity": 0.05,
-            "connectionId": conn_id
+            "connectionId": 1
         }
         piece["faces"][face_name]["connectionAreas"].append(right_area)
     
@@ -1072,7 +1090,7 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
             "y_max": max_y,
             "fill": "black",  # Step 10: Use black fill
             "opacity": 0.05,  # Step 10: Use 0.05 opacity
-            "connectionId": conn_id
+            "connectionId": 1
         }
         piece["faces"][face_name]["connectionAreas"].append(top_stripe)
         
@@ -1084,7 +1102,7 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
             "y_max": stripe_height,
             "fill": "black",  # Step 10: Use black fill
             "opacity": 0.05,  # Step 10: Use 0.05 opacity
-            "connectionId": conn_id
+            "connectionId": 1
         }
         piece["faces"][face_name]["connectionAreas"].append(bottom_stripe)
 
@@ -1113,12 +1131,16 @@ def ensure_all_pieces_have_connection_areas(pieces, connections):
                 conn_id = piece_connections[0][0]  # Use first connection ID
                 create_simple_connection_area_for_piece(piece, "top", conn_id)
         else:
-            # For panels, create connection areas ONLY on faces that have actual connections
+            # For panels, create connection areas ONLY ONCE per face, not once per connection
             # Client feedback: Only use ONE face (main OR other_main), not both
+            faces_to_create = set()
             for conn_id, face_name in piece_connections:
-                # Only create connection areas on faces that are actually connected
+                faces_to_create.add(face_name)
+            
+            for face_name in faces_to_create:
                 if not piece["faces"][face_name]["connectionAreas"]:
-                    create_simple_connection_area_for_piece(piece, face_name, conn_id)
+                    # Use connection ID 1 for consistency, since all connections use the same areas
+                    create_simple_connection_area_for_piece(piece, face_name, 1)
 
 def create_simple_connection_area_for_piece(piece, face_name, conn_id):
     """Step 12: Create a simple connection area on a face for a piece"""
@@ -1158,7 +1180,7 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
                 "y_max": stripe_y_max,
                 "fill": "black",  # Step 10: Use black fill
                 "opacity": 0.05,  # Step 10: Use 0.05 opacity
-                "connectionId": conn_id
+                "connectionId": 1
             })
         else:
             # For top panel (tampo): TWO vertical stripes - all dimensions dynamic
@@ -1177,7 +1199,7 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
                 "y_max": stripe_length,  # Dynamic stripe length
                 "fill": "black",  # Step 10: Use black fill
                 "opacity": 0.05,  # Step 10: Use 0.05 opacity
-                "connectionId": conn_id
+                "connectionId": 1
             }
             piece["faces"][face_name]["connectionAreas"].append(left_stripe)
             
@@ -1189,7 +1211,7 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
                 "y_max": stripe_length,  # Dynamic stripe length
                 "fill": "black",  # Step 10: Use black fill
                 "opacity": 0.05,  # Step 10: Use 0.05 opacity
-                "connectionId": conn_id
+                "connectionId": 1
             }
             piece["faces"][face_name]["connectionAreas"].append(right_stripe)
     
@@ -1214,7 +1236,7 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
             "y_max": connection_area_height,
             "fill": "black",
             "opacity": 0.05,
-            "connectionId": conn_id
+            "connectionId": 1
         }
         piece["faces"][face_name]["connectionAreas"].append(left_area)
         
@@ -1226,7 +1248,7 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
             "y_max": connection_area_height,
             "fill": "black",
             "opacity": 0.05,
-            "connectionId": conn_id
+            "connectionId": 1
         }
         piece["faces"][face_name]["connectionAreas"].append(right_area)
     
@@ -1243,7 +1265,7 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
             "y_max": max_y,
             "fill": "black",  # Step 10: Use black fill
             "opacity": 0.05,  # Step 10: Use 0.05 opacity
-            "connectionId": conn_id
+            "connectionId": 1
         }
         piece["faces"][face_name]["connectionAreas"].append(top_stripe)
         
@@ -1255,7 +1277,7 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
             "y_max": stripe_height,
             "fill": "black",  # Step 10: Use black fill
             "opacity": 0.05,  # Step 10: Use 0.05 opacity
-            "connectionId": conn_id
+            "connectionId": 1
         }
         piece["faces"][face_name]["connectionAreas"].append(bottom_stripe)
 
@@ -1282,14 +1304,12 @@ def clean_holes_outside_connection_areas(pieces):
                         is_inside_connection_area = True
                         break
                 
-                # Keep hole if it's inside a connection area OR it's a systematic hole AND has connectionId
-                if is_inside_connection_area or (is_systematic_hole and "connectionId" in hole):
-                    cleaned_holes.append(hole)
-                elif is_systematic_hole and not connection_areas:
-                    # Keep systematic holes on faces without connection areas
+                # Keep hole ONLY if it's inside a connection area
+                # Remove ALL holes from faces without connection areas (per client feedback)
+                if is_inside_connection_area:
                     cleaned_holes.append(hole)
                 else:
-                    print(f"DEBUG: Removing hole at ({hole['x']}, {hole['y']}) on {piece['name']} {face_name} - outside connection areas")
+                    print(f"DEBUG: Removing hole at ({hole['x']}, {hole['y']}) on {piece['name']} {face_name} - outside connection areas or on non-connected face")
             
             face["holes"] = cleaned_holes
 

@@ -77,11 +77,12 @@
                 top: !!panelTopFace
             });
             
-            // Draw connection areas from TOP face (where legs connect)
-            if (panelTopFace && panelTopFace.connectionAreas && panelTopFace.connectionAreas.length > 0) {
-                console.log('Drawing', panelTopFace.connectionAreas.length, 'connection areas from top face');
-                panelTopFace.connectionAreas.forEach((connArea, index) => {
-                    // Connection areas on top face use length x height coordinates
+            // Draw connection areas from BOTTOM face (where legs connect)
+            const panelBottomFace = panel.faces.find(f => f.faceSide === 'bottom');
+            if (panelBottomFace && panelBottomFace.connectionAreas && panelBottomFace.connectionAreas.length > 0) {
+                console.log('Drawing', panelBottomFace.connectionAreas.length, 'connection areas from bottom face');
+                panelBottomFace.connectionAreas.forEach((connArea, index) => {
+                    // Connection areas on bottom face use length x height coordinates
                     const panelX = offsetX + connArea.x_min * scale;
                     const panelY = offsetY + connArea.y_min * scale;
                     const areaWidth = (connArea.x_max - connArea.x_min) * scale;
@@ -103,37 +104,37 @@
                 });
             }
             
-            // Draw holes from main and other_main faces (visible from top view)
+            // Draw holes from bottom face that have connectionId (these are positioned inside connection areas by app.py)
             let holeIndex = 0;
             const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
             
-            [panelMainFace, panelOtherMainFace].forEach((face, faceIndex) => {
-                if (face && face.holes) {
-                    console.log(`Drawing ${face.holes.length} holes from ${face.faceSide} face`);
-                    face.holes.forEach((hole) => {
-                        // Map hole positions to panel top view
-                        // Main and other_main faces use length x height coordinates (same as top view)
-                        const holeX = offsetX + hole.x * scale;
-                        const holeY = offsetY + hole.y * scale;
-                        
-                        // Draw hole circle
-                        ctx.beginPath();
-                        ctx.arc(holeX, holeY, 6, 0, 2 * Math.PI);
-                        ctx.fillStyle = '#000';
-                        ctx.fill();
-                        ctx.strokeStyle = '#fff';
-                        ctx.lineWidth = 1;
-                        ctx.stroke();
-                        
-                        // Add hole label
-                        ctx.fillStyle = '#fff';
-                        ctx.font = 'bold 10px Arial';
-                        const label = labels[holeIndex % labels.length];
-                        ctx.fillText(label, holeX - 3, holeY + 3);
-                        holeIndex++;
-                    });
-                }
-            });
+            if (panelBottomFace && panelBottomFace.holes) {
+                // Get holes that have connectionId (these are the ones connected to legs)
+                const connectedHoles = panelBottomFace.holes.filter(hole => hole.connectionId);
+                console.log(`Drawing ${connectedHoles.length} connected holes from bottom face`);
+                
+                connectedHoles.forEach((hole) => {
+                    // Use the hole's actual coordinates (now positioned correctly by app.py inside connection areas)
+                    const holeX = offsetX + hole.x * scale;
+                    const holeY = offsetY + hole.y * scale;
+                    
+                    // Draw hole circle
+                    ctx.beginPath();
+                    ctx.arc(holeX, holeY, 6, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#000';
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    
+                    // Add hole label
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 10px Arial';
+                    const label = labels[holeIndex % labels.length];
+                    ctx.fillText(label, holeX - 3, holeY + 3);
+                    holeIndex++;
+                });
+            }
             
             // Add reference crosses at corners
             const crossSize = 10;
@@ -166,9 +167,9 @@
             ctx.fillText(`Panel: ${panel.name} (${panel.length}×${panel.height}×${panel.thickness}mm)`, 20, infoY);
             infoY += 20;
             
-            const totalHoles = (panelMainFace?.holes?.length || 0) + (panelOtherMainFace?.holes?.length || 0);
-            const totalConnAreas = panelTopFace?.connectionAreas?.length || 0;
-            ctx.fillText(`Holes: ${totalHoles}, Connection Areas: ${totalConnAreas}`, 20, infoY);
+            const connectedHoles = panelBottomFace?.holes?.filter(hole => hole.connectionId) || [];
+            const totalConnAreas = panelBottomFace?.connectionAreas?.length || 0;
+            ctx.fillText(`Connected Holes: ${connectedHoles.length}, Connection Areas: ${totalConnAreas}`, 20, infoY);
         }
     </script>
 </body>

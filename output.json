@@ -167,7 +167,26 @@
               "diameter": 8
             }
           ],
-          "connectionAreas": []
+          "connectionAreas": [
+            {
+              "x_min": 0.0,
+              "x_max": 19.9,
+              "y_min": 0.0,
+              "y_max": 299.9,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            },
+            {
+              "x_min": 180.1,
+              "x_max": 200.0,
+              "y_min": 0.0,
+              "y_max": 299.9,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            }
+          ]
         },
         {
           "faceSide": "other_main",
@@ -239,7 +258,26 @@
               "diameter": 8
             }
           ],
-          "connectionAreas": []
+          "connectionAreas": [
+            {
+              "x_min": 0.0,
+              "x_max": 19.9,
+              "y_min": 0.0,
+              "y_max": 299.9,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            },
+            {
+              "x_min": 180.1,
+              "x_max": 200.0,
+              "y_min": 0.0,
+              "y_max": 299.9,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            }
+          ]
         },
         {
           "faceSide": "top",
@@ -265,26 +303,7 @@
               "depth": 20
             }
           ],
-          "connectionAreas": [
-            {
-              "x_min": 19.9,
-              "x_max": 39.8,
-              "y_min": 0.0,
-              "y_max": 200.933,
-              "fill": "black",
-              "opacity": 0.05,
-              "connectionId": 1
-            },
-            {
-              "x_min": 180.1,
-              "x_max": 200.0,
-              "y_min": 0.0,
-              "y_max": 200.933,
-              "fill": "black",
-              "opacity": 0.05,
-              "connectionId": 1
-            }
-          ]
+          "connectionAreas": []
         },
         {
           "faceSide": "bottom",
@@ -297,7 +316,8 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "depth": 20
+              "depth": 20,
+              "connectionId": 1
             },
             {
               "x": 190.0,
@@ -307,54 +327,48 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "depth": 20
-            },
-            {
-              "x": 10.0,
-              "y": 10.0,
-              "type": "top_corner",
-              "targetType": "20",
-              "ferragemSymbols": [
-                "glue"
-              ],
-              "connectionId": 1,
-              "depth": 20
-            },
-            {
-              "x": 190.0,
-              "y": 10.0,
-              "type": "top_corner",
-              "targetType": "20",
-              "ferragemSymbols": [
-                "glue"
-              ],
-              "connectionId": 1,
-              "depth": 20
-            },
-            {
-              "x": 10.0,
-              "y": 10.0,
-              "type": "top_corner",
-              "targetType": "20",
-              "ferragemSymbols": [
-                "glue"
-              ],
-              "connectionId": 2,
-              "depth": 20
-            },
-            {
-              "x": 190.0,
-              "y": 10.0,
-              "type": "top_corner",
-              "targetType": "20",
-              "ferragemSymbols": [
-                "glue"
-              ],
-              "connectionId": 2,
-              "depth": 20
+              "depth": 20,
+              "connectionId": 1
             }
           ],
-          "connectionAreas": []
+          "connectionAreas": [
+            {
+              "x_min": 0,
+              "x_max": 30.0,
+              "y_min": 0,
+              "y_max": 30.0,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            },
+            {
+              "x_min": 170.0,
+              "x_max": 200.0,
+              "y_min": 0,
+              "y_max": 30.0,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 1
+            },
+            {
+              "x_min": 19.9,
+              "x_max": 39.8,
+              "y_min": 0.0,
+              "y_max": 200.933,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 2
+            },
+            {
+              "x_min": 180.1,
+              "x_max": 200.0,
+              "y_min": 0.0,
+              "y_max": 200.933,
+              "fill": "black",
+              "opacity": 0.05,
+              "connectionId": 2
+            }
+          ]
         },
         {
           "faceSide": "left",

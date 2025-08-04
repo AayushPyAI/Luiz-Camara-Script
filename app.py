@@ -763,9 +763,11 @@ def map_face_holes_proximity(p1, p2, face1, face2, conn_id, template_thickness):
     # Map holes from legs to top panel - align subjective holes with objective holes
     if p1_is_leg and not p2_is_leg:
         # p1 is leg, p2 is top panel - map leg holes to top panel
+        print(f"DEBUG: Mapping holes from {p1['name']} to {p2['name']} with connectionId {conn_id}")
         map_leg_holes_to_top_panel(p1, p2, face1, face2, conn_id, template_thickness)
     elif not p1_is_leg and p2_is_leg:
         # p1 is top panel, p2 is leg - map leg holes to top panel  
+        print(f"DEBUG: Mapping holes from {p2['name']} to {p1['name']} with connectionId {conn_id}")
         map_leg_holes_to_top_panel(p2, p1, face2, face1, conn_id, template_thickness)
 
 # ============================================================================
@@ -777,10 +779,12 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
     
     # Get the systematic holes from the leg face
     leg_holes = leg_piece["faces"][leg_face]["holes"]
+    print(f"DEBUG: Found {len(leg_holes)} holes on {leg_piece['name']} {leg_face} face")
     
     # Step 6: "Map the corresponding face of the primary piece on the secondary piece"
     # Step 6: "Allocate subjective holes paired with objective holes already existing on other pieces"
     for leg_hole in leg_holes:
+        print(f"DEBUG: Processing hole at ({leg_hole['x']}, {leg_hole['y']}) on {leg_piece['name']}")
         # Transform coordinates from leg to top panel
         top_x, top_y = transform_leg_to_top_coordinates(leg_piece, top_piece, leg_face, top_face, leg_hole["x"], leg_hole["y"], conn_id)
         
@@ -789,6 +793,7 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
             # Step 6: "Validate and classify mapped holes"
             
             # Validate coordinates are within piece limits
+            print(f"DEBUG: Checking coordinates ({top_x}, {top_y}) for piece limits length={top_piece['length']}, thickness={top_piece['thickness']}")
             if (0 <= top_x <= top_piece["length"] and 0 <= top_y <= top_piece["thickness"]):
                 
                 # Step 6: "Classify holes based on position"
@@ -800,20 +805,38 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
                 depth = leg_hole.get("depth", 20)
                 diameter = leg_hole.get("diameter")
                 
-                # Create the mapped hole with connectionId
-                mapped_hole = criar_hole(
-                    top_x, top_y, 
-                    hole_type, 
-                    template_thickness, 
-                    hardware, 
-                    connection_id=conn_id,
-                    depth=depth,
-                    diameter=diameter
+                # Check if hole already exists at this position to prevent duplicates
+                existing_holes = top_piece["faces"][top_face]["holes"]
+                hole_exists = any(
+                    abs(existing["x"] - top_x) < 5.0 and abs(existing["y"] - top_y) < 5.0
+                    for existing in existing_holes
                 )
                 
-                # Add to top panel face
-                top_piece["faces"][top_face]["holes"].append(mapped_hole)
-                print(f"Mapped hole from {leg_piece['name']} {leg_face} to {top_piece['name']} {top_face}: ({top_x}, {top_y}) - {hole_type}")
+                if not hole_exists:
+                    # Create the mapped hole with connectionId
+                    mapped_hole = criar_hole(
+                        top_x, top_y, 
+                        hole_type, 
+                        template_thickness, 
+                        hardware, 
+                        connection_id=conn_id,
+                        depth=depth,
+                        diameter=diameter
+                    )
+                    
+                    # Add to top panel face
+                    top_piece["faces"][top_face]["holes"].append(mapped_hole)
+                    print(f"Mapped hole from {leg_piece['name']} {leg_face} to {top_piece['name']} {top_face}: ({top_x}, {top_y}) - {hole_type}")
+                else:
+                    # Update existing hole with connectionId if it doesn't have one
+                    for existing_hole in existing_holes:
+                        if abs(existing_hole["x"] - top_x) < 5.0 and abs(existing_hole["y"] - top_y) < 5.0:
+                            if "connectionId" not in existing_hole:
+                                existing_hole["connectionId"] = conn_id
+                                print(f"Updated existing hole with connectionId: ({top_x}, {top_y}) - {hole_type}")
+                            break
+            else:
+                print(f"DEBUG: Coordinates ({top_x}, {top_y}) are outside piece limits!")
 
 def transform_leg_to_top_coordinates(leg_piece, top_piece, leg_face, top_face, leg_x, leg_y, conn_id):
     """Step 10: Transform coordinates from leg coordinate system to top panel coordinate system"""
@@ -831,13 +854,33 @@ def transform_leg_to_top_coordinates(leg_piece, top_piece, leg_face, top_face, l
             # Map leg top coordinates to panel bottom coordinates
             # The leg's top face (length x thickness) maps to panel's bottom face (length x thickness)
             
-            # Scale leg coordinates to panel coordinates
+            # Base coordinates (same for all legs)
             scale_x = top_piece["length"] / leg_piece["length"]
             scale_y = top_piece["thickness"] / leg_piece["thickness"]
             
-            top_x = leg_x * scale_x
-            top_y = leg_y * scale_y
+            base_x = leg_x * scale_x
+            base_y = leg_y * scale_y
             
+            # Offset based on connection ID to avoid overlapping holes
+            if conn_id == 1:
+                # First connection: use base coordinates
+                top_x = base_x
+                top_y = base_y
+            elif conn_id == 2:
+                # Second connection: offset to different area
+                # Position holes in the middle area of the panel
+                offset_x = top_piece["length"] * 0.1  # 10% offset from left
+                offset_y = top_piece["height"] * 0.3  # 30% down the panel
+                top_x = base_x + offset_x if base_x < top_piece["length"] / 2 else base_x - offset_x
+                top_y = base_y + offset_y
+            else:
+                # Additional connections: use different offsets
+                offset_x = top_piece["length"] * 0.15 * (conn_id - 1)
+                offset_y = top_piece["height"] * 0.2 * (conn_id - 1)
+                top_x = (base_x + offset_x) % top_piece["length"]
+                top_y = (base_y + offset_y) % top_piece["height"]
+            
+            print(f"DEBUG: Transformed ({leg_x}, {leg_y}) to ({top_x}, {top_y}) for connectionId {conn_id}")
             return top_x, top_y
     
     # Use connection areas for precise mapping
@@ -861,17 +904,16 @@ def transform_leg_to_top_coordinates(leg_piece, top_piece, leg_face, top_face, l
 # Helper to decide if we should create a connection area on a given face
 
 def _should_create_conn_area(piece, face_name):
-    """Step 7: Create connection areas on leg top faces AND panel faces (main, other_main, and top)."""
+    """Step 7: Create connection areas on leg top faces AND panel faces (main, other_main, and bottom)."""
     def is_leg_piece(p):
         return ("perna" in p["name"].lower()) or (abs(p["length"] - p["height"]) < 50 and max(p["length"], p["height"]) < 250)
     
     # Create connection areas on:
-    # 1. Top face of legs 
-    # 2. Main/other_main faces of panels
-    # 3. Top face of panels (like tampo)
+    # 1. Top face of legs (where they connect to table)
+    # 2. Main/other_main/bottom faces of panels (where connections occur)
     if is_leg_piece(piece) and face_name == "top":
         return True
-    elif not is_leg_piece(piece) and face_name in ["main", "other_main", "top"]:
+    elif not is_leg_piece(piece) and face_name in ["main", "other_main", "bottom"]:
         return True
     else:
         return False
@@ -947,37 +989,66 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
                 "connectionId": conn_id
             })
         else:
-            # For top panel (tampo): TWO vertical stripes - all dimensions dynamic
-            # Step 10: "Respect real limits of overlap area"
-            # Calculate dimensions based on piece size
-            stripe_width = piece["thickness"]  # Use piece thickness for stripe width
-            stripe_length = piece["height"] * 0.67  # 2/3 of piece height for stripe length
-            margin_offset = piece["thickness"]  # Use piece thickness for margin offset
-            
-            # Create connection areas for both left and right stripes
-            # Left stripe - margin_offset from left margin
-            left_stripe = {
-                "x_min": margin_offset,  # Dynamic margin offset
-                "x_max": margin_offset + stripe_width,
-                "y_min": 0.0,
-                "y_max": stripe_length,  # Dynamic stripe length
-                "fill": "black",  # Step 10: Use black fill
-                "opacity": 0.05,  # Step 10: Use 0.05 opacity
-                "connectionId": conn_id
-            }
-            piece["faces"][face_name]["connectionAreas"].append(left_stripe)
-            
-            # Right stripe - at right edge
-            right_stripe = {
-                "x_min": max_x - stripe_width,
-                "x_max": max_x,
-                "y_min": 0.0,
-                "y_max": stripe_length,  # Dynamic stripe length
-                "fill": "black",  # Step 10: Use black fill
-                "opacity": 0.05,  # Step 10: Use 0.05 opacity
-                "connectionId": conn_id
-            }
-            piece["faces"][face_name]["connectionAreas"].append(right_stripe)
+            # For tampo bottom face: Create rectangles around actual hole positions
+            # Find the holes on this face to position connection areas around them
+            if face_holes:
+                # Group holes by their x-coordinate to create connection areas
+                hole_groups = {}
+                for hole in face_holes:
+                    x_key = round(hole["x"] / 50) * 50  # Group holes within 50mm
+                    if x_key not in hole_groups:
+                        hole_groups[x_key] = []
+                    hole_groups[x_key].append(hole)
+                
+                # Create a connection area for each group of holes
+                area_width = 40.0  # Connection area width around holes
+                area_height = 40.0  # Connection area height around holes
+                
+                for group_x, holes_in_group in hole_groups.items():
+                    # Calculate center position from holes in this group
+                    avg_x = sum(h["x"] for h in holes_in_group) / len(holes_in_group)
+                    avg_y = sum(h["y"] for h in holes_in_group) / len(holes_in_group)
+                    
+                    # Create connection area centered on the holes
+                    connection_area = {
+                        "x_min": max(0, avg_x - area_width/2),
+                        "x_max": min(max_x, avg_x + area_width/2),
+                        "y_min": max(0, avg_y - area_height/2),
+                        "y_max": min(max_y, avg_y + area_height/2),
+                        "fill": "black",
+                        "opacity": 0.05,
+                        "connectionId": conn_id
+                    }
+                    piece["faces"][face_name]["connectionAreas"].append(connection_area)
+            else:
+                # Fallback: create areas based on expected hole positions (ft, ft) and (length-ft, ft)
+                ft = piece["half_thickness"]
+                area_width = 40.0
+                area_height = 40.0
+                
+                # Left connection area
+                left_area = {
+                    "x_min": max(0, ft - area_width/2),
+                    "x_max": min(max_x, ft + area_width/2),
+                    "y_min": max(0, ft - area_height/2),
+                    "y_max": min(max_y, ft + area_height/2),
+                    "fill": "black",
+                    "opacity": 0.05,
+                    "connectionId": conn_id
+                }
+                piece["faces"][face_name]["connectionAreas"].append(left_area)
+                
+                # Right connection area
+                right_area = {
+                    "x_min": max(0, (max_x - ft) - area_width/2),
+                    "x_max": min(max_x, (max_x - ft) + area_width/2),
+                    "y_min": max(0, ft - area_height/2),
+                    "y_max": min(max_y, ft + area_height/2),
+                    "fill": "black",
+                    "opacity": 0.05,
+                    "connectionId": conn_id
+                }
+                piece["faces"][face_name]["connectionAreas"].append(right_area)
     
     elif face_name in ["main", "other_main"]:
         # For main faces: vertical stripes on edges
@@ -1042,45 +1113,41 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
 # ============================================================================
 
 def ensure_all_pieces_have_connection_areas(pieces, connections):
-    """Step 12: Ensure every piece has at least one connection area on appropriate faces"""
+    """Step 12: Ensure every piece has connection areas on all appropriate faces"""
     for piece in pieces:
-        # Check if piece already has any connection areas
-        has_connection_areas = any(
-            face["connectionAreas"] 
-            for face in piece["faces"].values()
-        )
+        # Find if this piece is involved in any connections
+        piece_connections = []
+        for conn in connections:
+            if pieces[conn['piece1']]['name'] == piece['name']:
+                piece_connections.append((conn['id'], conn['face1']))
+            elif pieces[conn['piece2']]['name'] == piece['name']:
+                piece_connections.append((conn['id'], conn['face2']))
         
-        if not has_connection_areas:
-            # Find if this piece is involved in any connections
-            piece_connections = []
-            for conn in connections:
-                if pieces[conn['piece1']]['name'] == piece['name']:
-                    piece_connections.append((conn['id'], conn['face1']))
-                elif pieces[conn['piece2']]['name'] == piece['name']:
-                    piece_connections.append((conn['id'], conn['face2']))
-            
-            # Create connection areas on appropriate faces based on piece type
-            def is_leg_piece(p):
-                return ("perna" in p["name"].lower()) or (abs(p["length"] - p["height"]) < 50 and max(p["length"], p["height"]) < 250)
-            
-            if is_leg_piece(piece):
-                # For legs, create connection area on top face if none exists
-                if not piece["faces"]["top"]["connectionAreas"] and piece_connections:
-                    conn_id = piece_connections[0][0]  # Use first connection ID
-                    create_simple_connection_area_for_piece(piece, "top", conn_id)
-            else:
-                # For panels, create connection area on appropriate face
-                if piece_connections:
-                    conn_id = piece_connections[0][0]  # Use first connection ID
-                    
-                    # Try to create connection area on top face first (for tampo)
-                    if not piece["faces"]["top"]["connectionAreas"]:
-                        create_simple_connection_area_for_piece(piece, "top", conn_id)
-                    # Then try other_main, then main as fallbacks
-                    elif not piece["faces"]["other_main"]["connectionAreas"]:
-                        create_simple_connection_area_for_piece(piece, "other_main", conn_id)
-                    elif not piece["faces"]["main"]["connectionAreas"]:
-                        create_simple_connection_area_for_piece(piece, "main", conn_id)
+        # Create connection areas on appropriate faces based on piece type
+        def is_leg_piece(p):
+            return ("perna" in p["name"].lower()) or (abs(p["length"] - p["height"]) < 50 and max(p["length"], p["height"]) < 250)
+        
+        if is_leg_piece(piece):
+            # For legs, create connection area on top face if none exists
+            if not piece["faces"]["top"]["connectionAreas"] and piece_connections:
+                conn_id = piece_connections[0][0]  # Use first connection ID
+                create_simple_connection_area_for_piece(piece, "top", conn_id)
+        else:
+            # For panels, create connection areas on ALL appropriate faces (main, other_main, bottom)
+            if piece_connections:
+                conn_id = piece_connections[0][0]  # Use first connection ID
+                
+                # Create connection areas on main face if none exists
+                if not piece["faces"]["main"]["connectionAreas"]:
+                    create_simple_connection_area_for_piece(piece, "main", conn_id)
+                
+                # Create connection areas on other_main face if none exists  
+                if not piece["faces"]["other_main"]["connectionAreas"]:
+                    create_simple_connection_area_for_piece(piece, "other_main", conn_id)
+                
+                # Create connection areas on bottom face if none exists (for tampo - where legs connect)
+                if not piece["faces"]["bottom"]["connectionAreas"]:
+                    create_simple_connection_area_for_piece(piece, "bottom", conn_id)
 
 def create_simple_connection_area_for_piece(piece, face_name, conn_id):
     """Step 12: Create a simple connection area on a face for a piece"""

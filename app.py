@@ -1360,24 +1360,131 @@ def ensure_all_pieces_have_faces(pieces, template_thickness):
 # STEP 15: ADD SINGER REINFORCEMENT HOLES
 # ============================================================================
 
-def add_singer_reinforcement_holes(pieces, connections, template_thickness):
-    """Step 15: Add singer reinforcement holes for face-to-top connections"""
-    for conn in connections:
-        p1 = pieces[conn['piece1']]
-        p2 = pieces[conn['piece2']]
+def add_singer_holes_step7(pieces, template_thickness):
+    """Step 7: Add singer holes by mirroring connection areas to opposite faces"""
+    for piece in pieces:
+        # Check main face for connection areas
+        main_face = piece["faces"]["main"]
+        other_main_face = piece["faces"]["other_main"]
         
-        # Get the connecting faces from proximity detection
-        face1 = conn['face1']
-        face2 = conn['face2']
+        # Step 7: Mirror connection areas from main to other_main
+        if main_face["connectionAreas"]:
+            print(f"DEBUG: Mirroring {len(main_face['connectionAreas'])} connection areas from main to other_main on {piece['name']}")
+            mirror_connection_areas_with_singer_holes(piece, "main", "other_main", template_thickness)
         
-        # Add singer holes on opposite faces for reinforcement
-        if face1 in ["main", "other_main"]:
-            opposite_face = "other_main" if face1 == "main" else "main"
-            add_singer_holes_to_face(p1, opposite_face, template_thickness)
+        # Step 7: Mirror connection areas from other_main to main  
+        if other_main_face["connectionAreas"]:
+            print(f"DEBUG: Mirroring {len(other_main_face['connectionAreas'])} connection areas from other_main to main on {piece['name']}")
+            mirror_connection_areas_with_singer_holes(piece, "other_main", "main", template_thickness)
+
+def mirror_connection_areas_with_singer_holes(piece, source_face_name, target_face_name, template_thickness):
+    """Step 7: Mirror connection areas from source face to target face and add singer holes"""
+    source_face = piece["faces"][source_face_name]
+    target_face = piece["faces"][target_face_name]
+    
+    for conn_area in source_face["connectionAreas"]:
+        # Mirror the connection area coordinates (same dimensions, no coordinate transformation needed)
+        mirrored_area = {
+            "x_min": conn_area["x_min"],
+            "y_min": conn_area["y_min"], 
+            "x_max": conn_area["x_max"],
+            "y_max": conn_area["y_max"],
+            "fill": "gray",  # Different color to distinguish singer areas
+            "opacity": 0.1   # Slightly more visible
+            # Note: No connectionId for singer areas as per client requirement
+        }
         
-        if face2 in ["main", "other_main"]:
-            opposite_face = "other_main" if face2 == "main" else "main"
-            add_singer_holes_to_face(p2, opposite_face, template_thickness)
+        # Add mirrored connection area to target face
+        target_face["connectionAreas"].append(mirrored_area)
+        print(f"DEBUG: Added mirrored connection area to {target_face_name}: {mirrored_area['x_min']}-{mirrored_area['x_max']} x {mirrored_area['y_min']}-{mirrored_area['y_max']}")
+        
+        # Add singer holes within the mirrored area
+        add_singer_holes_in_area(piece, source_face_name, target_face_name, mirrored_area, template_thickness)
+
+def add_singer_holes_in_area(piece, source_face_name, target_face_name, area, template_thickness):
+    """Step 7: Add singer holes by mirroring actual holes from source face across center axis"""
+    source_face = piece["faces"][source_face_name]
+    target_face = piece["faces"][target_face_name]
+    
+    # Get piece dimensions for center axis calculation
+    piece_height = piece["height"]  # For main/other_main faces
+    center_y = piece_height / 2
+    
+    # Find all holes in the source face that fall within this connection area
+    source_holes_in_area = []
+    for hole in source_face["holes"]:
+        if (area["x_min"] <= hole["x"] <= area["x_max"] and 
+            area["y_min"] <= hole["y"] <= area["y_max"]):
+            source_holes_in_area.append(hole)
+    
+    print(f"DEBUG: Found {len(source_holes_in_area)} holes in source area to mirror")
+    
+    # Mirror each hole across the center axis
+    for source_hole in source_holes_in_area:
+        # Calculate mirrored Y position: mirror_y = 2 * center_y - original_y
+        mirror_x = source_hole["x"]  # X stays the same
+        mirror_y = 2 * center_y - source_hole["y"]  # Mirror across center axis
+        
+        # Determine singer hole type based on position and proximity
+        singer_type = determine_singer_hole_type(piece, mirror_x, mirror_y, target_face_name)
+        
+        # Only add if the mirrored position doesn't overlap with existing holes
+        if not hole_exists_near_position(target_face["holes"], mirror_x, mirror_y, min_distance=8.0):
+            singer_hole = criar_hole(
+                mirror_x, mirror_y, 
+                singer_type, 
+                template_thickness, 
+                "singer_dowel", 
+                depth=30
+            )
+            target_face["holes"].append(singer_hole)
+            print(f"DEBUG: Mirrored hole from ({source_hole['x']}, {source_hole['y']}) to ({mirror_x}, {mirror_y}) as {singer_type}")
+
+def determine_singer_hole_type(piece, x, y, face_name):
+    """Step 7: Determine singer hole type based on position and proximity to edges"""
+    ft = piece["half_thickness"]
+    
+    if face_name in ["main", "other_main"]:
+        l = piece["length"]
+        h = piece["height"]
+        
+        # singer_central: somewhere in the middle of the face, without proximity to edges
+        # Check if hole is in the middle Y zone (not near top or bottom edges)
+        near_top = y > (h - 50)    # Within 50mm of top edge
+        near_bottom = y < 50       # Within 50mm of bottom edge
+        in_middle_y = not (near_top or near_bottom)
+        
+        # Also check distance from left/right edges
+        dist_from_left = abs(x - ft)
+        dist_from_right = abs(x - (l - ft))
+        
+        # singer_flap: at half thickness from any border (left, right, top, bottom)
+        near_left_border = dist_from_left <= 5   # Within 5mm of half_thickness position from left
+        near_right_border = dist_from_right <= 5  # Within 5mm of half_thickness position from right
+        
+        if near_left_border or near_right_border:
+            return "singer_flap"
+        
+        # singer_central: in middle Y zone and away from all borders
+        if in_middle_y:
+            return "singer_central"
+        
+        # singer_flap: near any edge or not in middle zone
+        return "singer_flap"
+            
+    elif face_name in ["top", "bottom", "left", "right"]:
+        # singer_channel: when the hole is on a slat or top face
+        return "singer_channel"
+    
+    return "singer_flap"  # Default fallback
+
+def hole_exists_near_position(face_holes, x, y, min_distance=5.0):
+    """Check if any hole exists within min_distance of the position"""
+    for existing_hole in face_holes:
+        distance = ((existing_hole["x"] - x) ** 2 + (existing_hole["y"] - y) ** 2) ** 0.5
+        if distance < min_distance:
+            return True
+    return False
 
 def add_singer_holes_to_face(piece, face_name, template_thickness):
     """Step 15: Add singer holes to a specific face"""
@@ -1537,20 +1644,11 @@ def processar_json_entrada(input_path, output_path):
     clean_holes_outside_connection_areas(pecas_3d)
     
     # ============================================================================
-    # STEP 15: ADD SINGER REINFORCEMENT HOLES
+    # STEP 7: ADD SINGER REINFORCEMENT HOLES
     # ============================================================================
     
-    # For simple models, don't add singer reinforcement holes since client expects exact count
-    # Only add singer holes for complex models with many pieces
-    if len(pecas_3d) > 3:  # Only for complex models, not the simple 3-piece model
-        for peca in pecas_3d:
-            # Add singer holes to opposite main face if this piece has connections
-            has_connections = any(face["connectionAreas"] for face in peca["faces"].values())
-            if has_connections:
-                # Only add singer holes to main faces of larger pieces (not legs)
-                if peca["thickness"] > 25:  # Only for thicker pieces like tampo
-                    add_singer_holes_to_face(peca, "main", template_thickness)
-                    add_singer_holes_to_face(peca, "other_main", template_thickness)
+    # Step 7: Add singer holes on opposite faces to mirror connection areas
+    add_singer_holes_step7(pecas_3d, template_thickness)
     
     # ============================================================================
     # STEP 14: ENSURE ALL PIECES HAVE FACES

@@ -167,6 +167,85 @@
               "fill": "black",
               "opacity": 0.05,
               "connectionId": 1
+            },
+            {
+              "x_min": 20,
+              "y_min": 0.0,
+              "x_max": 40,
+              "y_max": 200,
+              "fill": "gray",
+              "opacity": 0.1
+            },
+            {
+              "x_min": 180,
+              "y_min": 0.0,
+              "x_max": 200,
+              "y_max": 200,
+              "fill": "gray",
+              "opacity": 0.1
+            }
+          ]
+        },
+        {
+          "faceSide": "other_main",
+          "holes": [
+            {
+              "x": 30.0,
+              "y": 290.0,
+              "type": "singer_flap",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "singer_dowel"
+              ],
+              "depth": 30
+            },
+            {
+              "x": 30.0,
+              "y": 110.0,
+              "type": "singer_central",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "singer_dowel"
+              ],
+              "depth": 30
+            },
+            {
+              "x": 190.0,
+              "y": 290.0,
+              "type": "singer_flap",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "singer_dowel"
+              ],
+              "depth": 30
+            },
+            {
+              "x": 190.0,
+              "y": 110.0,
+              "type": "singer_flap",
+              "targetType": "20",
+              "ferragemSymbols": [
+                "singer_dowel"
+              ],
+              "depth": 30
+            }
+          ],
+          "connectionAreas": [
+            {
+              "x_min": 20,
+              "y_min": 0.0,
+              "x_max": 40,
+              "y_max": 200,
+              "fill": "gray",
+              "opacity": 0.1
+            },
+            {
+              "x_min": 180,
+              "y_min": 0.0,
+              "x_max": 200,
+              "y_max": 200,
+              "fill": "gray",
+              "opacity": 0.1
             }
           ]
         }

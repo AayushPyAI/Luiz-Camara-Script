@@ -4,7 +4,7 @@
       "name": "perna direita",
       "length": 200,
       "height": 200,
-      "thickness": 19.9,
+      "thickness": 20,
       "quantity": 1,
       "faces": [
         {
@@ -38,7 +38,7 @@
               "x_min": 0.0,
               "y_min": 0.0,
               "x_max": 200.0,
-              "y_max": 19.9,
+              "y_max": 20.0,
               "fill": "black",
               "opacity": 0.05,
               "connectionId": 1
@@ -51,7 +51,7 @@
       "name": "perna esquerda",
       "length": 200,
       "height": 200,
-      "thickness": 19.9,
+      "thickness": 20,
       "quantity": 1,
       "faces": [
         {
@@ -85,7 +85,7 @@
               "x_min": 0.0,
               "y_min": 0.0,
               "x_max": 200.0,
-              "y_max": 19.9,
+              "y_max": 20.0,
               "fill": "black",
               "opacity": 0.05,
               "connectionId": 1
@@ -97,8 +97,8 @@
     {
       "name": "tampo",
       "length": 200,
-      "height": 299.9,
-      "thickness": 19.9,
+      "height": 300,
+      "thickness": 20,
       "quantity": 1,
       "faces": [
         {

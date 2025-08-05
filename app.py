@@ -7,10 +7,16 @@ from collections import defaultdict
 # ============================================================================
 
 def arredondar(valor):
-    """Step 1: Round dimensions and coordinates to first decimal place"""
+    """Step 1: Round dimensions and coordinates to clean values"""
+    # Round to 1 decimal place first
     arredondado = round(valor, 1)
-    if abs(arredondado - round(arredondado)) < 0.1:
+    
+    # If very close to a whole number (within 0.15), round to whole number
+    # This handles cases like 19.9 -> 20, 29.9 -> 30, 1.9 -> 2
+    if abs(arredondado - round(arredondado)) <= 0.15:
         return float(round(arredondado))
+    
+    # Otherwise keep 1 decimal place
     return arredondado
 
 def mm(valor):

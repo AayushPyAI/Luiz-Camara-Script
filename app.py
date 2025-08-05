@@ -122,14 +122,14 @@ def adicionar_holes_sistematicos(peca, template_thickness):
     t = peca["thickness"]
     ft = peca["half_thickness"]
 
-    def add_hole_if_not_exists(face_holes, x, y, hole_type, hardware, depth=None, diameter=None):
+    def add_hole_if_not_exists(face_holes, x, y, hole_type, hardware, depth=None, diameter=None, connection_id=None):
         """Add hole only if no hole exists at this position"""
         for existing_hole in face_holes:
             if abs(existing_hole["x"] - x) < 8.0 and abs(existing_hole["y"] - y) < 8.0:
                 return  # Hole already exists at this position
         
         # Add the hole
-        hole = criar_hole(x, y, hole_type, template_thickness, hardware, depth=depth, diameter=diameter)
+        hole = criar_hole(x, y, hole_type, template_thickness, hardware, connection_id=connection_id, depth=depth, diameter=diameter)
         face_holes.append(hole)
     
     def add_intermediate_holes_if_needed(face_holes, hole1_pos, hole2_pos, hole_type, hardware, depth=None, diameter=None):
@@ -155,7 +155,12 @@ def adicionar_holes_sistematicos(peca, template_thickness):
         ]
         
         for x, y, hole_type in corner_positions:
-            add_hole_if_not_exists(face["holes"], x, y, hole_type, "glue", depth=20)
+            # Assign connection ID based on X position to match panel connection areas
+            if x < l/2:  # Left hole (x=10.0) maps to left panel connection area
+                connection_id = 1
+            else:  # Right hole (x=190.0) maps to right panel connection area  
+                connection_id = 2
+            add_hole_if_not_exists(face["holes"], x, y, hole_type, "glue", depth=20, connection_id=connection_id)
         
     else:
         # For panels: Follow guide rules exactly
@@ -851,6 +856,13 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
                 # Second leg holes: map to Y=190 to pair with leg holes
                 hole_y = 190.0
             
+            # Determine connection ID based on which connection area (left vs right)
+            # All holes in the same connection area should have the same ID
+            if hole_x < 100:  # Left connection area
+                area_connection_id = 1
+            else:  # Right connection area
+                area_connection_id = 2
+            
             # Classify hole type
             hole_type = classify_hole_type(hole_x, hole_y, top_piece, top_face)
             
@@ -859,20 +871,20 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
             depth = leg_hole.get("depth", 20)
             diameter = leg_hole.get("diameter")
             
-            # Create mapped hole with correct connection ID based on which leg it comes from
+            # Create mapped hole with connection ID based on connection area
             mapped_hole = criar_hole(
-                    hole_x, hole_y, 
-                    hole_type, 
-                    template_thickness, 
-                    hardware, 
-                connection_id=conn_id,  # Use the actual connection ID for this leg
-                    depth=depth,
-                    diameter=diameter
-                )
-                
+                hole_x, hole_y,
+                hole_type,
+                template_thickness,
+                hardware,
+                connection_id=area_connection_id,  # Use connection area ID, not leg ID
+                depth=depth,
+                diameter=diameter
+            )
+            
             # Add to top panel face
             top_piece["faces"][top_face]["holes"].append(mapped_hole)
-            print(f"Created mapped hole: {leg_piece['name']} -> ({hole_x:.1f}, {hole_y:.1f}) in area {target_area['connectionId']}")
+            print(f"Created mapped hole: {leg_piece['name']} -> ({hole_x:.1f}, {hole_y:.1f}) in area {area_connection_id}")
         else:
             print(f"WARNING: No suitable connection area found for hole at ({leg_hole['x']}, {leg_hole['y']}) on {leg_piece['name']}")
 

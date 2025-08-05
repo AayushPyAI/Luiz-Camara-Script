@@ -155,12 +155,9 @@ def adicionar_holes_sistematicos(peca, template_thickness):
         ]
         
         for x, y, hole_type in corner_positions:
-            # Assign connection ID based on X position to match panel connection areas
-            if x < l/2:  # Left hole (x=10.0) maps to left panel connection area
-                connection_id = 1
-            else:  # Right hole (x=190.0) maps to right panel connection area  
-                connection_id = 2
-            add_hole_if_not_exists(face["holes"], x, y, hole_type, "glue", depth=20, connection_id=connection_id)
+            # Connection ID will be set later when connections are detected
+            # For now, create holes without connection ID
+            add_hole_if_not_exists(face["holes"], x, y, hole_type, "glue", depth=20)
         
     else:
         # For panels: Follow guide rules exactly
@@ -808,6 +805,12 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
     # Get the systematic holes from the leg face
     leg_holes = leg_piece["faces"][leg_face]["holes"]
     print(f"DEBUG: Found {len(leg_holes)} holes on {leg_piece['name']} {leg_face} face")
+    
+    # Update all leg holes with the correct connection ID
+    # All holes from the same leg connection should have the same connection ID
+    for leg_hole in leg_holes:
+        leg_hole["connectionId"] = conn_id
+    print(f"DEBUG: Updated {len(leg_holes)} leg holes with connectionId {conn_id}")
     
     # Find all connection areas on the top face for mirroring holes
     connection_areas = top_piece["faces"][top_face]["connectionAreas"]

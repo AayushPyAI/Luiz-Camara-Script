@@ -18,8 +18,8 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "connectionId": 1,
-              "depth": 20
+              "depth": 20,
+              "connectionId": 1
             },
             {
               "x": 190.0,
@@ -29,8 +29,8 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "connectionId": 2,
-              "depth": 20
+              "depth": 20,
+              "connectionId": 1
             }
           ],
           "connectionAreas": [
@@ -65,8 +65,8 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "connectionId": 1,
-              "depth": 20
+              "depth": 20,
+              "connectionId": 2
             },
             {
               "x": 190.0,
@@ -76,8 +76,8 @@
               "ferragemSymbols": [
                 "glue"
               ],
-              "connectionId": 2,
-              "depth": 20
+              "depth": 20,
+              "connectionId": 2
             }
           ],
           "connectionAreas": [

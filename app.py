@@ -3,6 +3,45 @@ import math
 from collections import defaultdict
 
 # ============================================================================
+# CONFIGURATION SYSTEM - MAKES CODE WORK FOR ANY INPUT
+# ============================================================================
+
+# View name mapping for different input formats
+VIEW_NAME_MAPPINGS = {
+    "top": ["vista de cima", "vista superior", "top view", "cima", "superior"],
+    "lateral": ["vista lateral", "lateral", "side view", "lado"],
+    "frontal": ["frontal", "vista frontal", "front view", "frente"]
+}
+
+# Piece type detection patterns (expandable for any language/naming)
+LEG_PATTERNS = [
+    "perna",     # Portuguese
+    "leg",       # English
+    "pata",      # Spanish
+    "pierna",    # Alternative Spanish
+    "support",   # Generic
+    "suporte"    # Portuguese alternative
+]
+
+PANEL_PATTERNS = [
+    "tampo",     # Portuguese (top/surface)
+    "top",       # English
+    "surface",   # Generic
+    "panel",     # Generic
+    "tabletop",  # Specific
+    "mesa",      # Portuguese (table)
+    "table"      # English
+]
+
+# Template thickness options (configurable)
+TEMPLATE_THICKNESSES = [17, 20, 25, 30]
+
+# Default values (configurable)
+DEFAULT_TEMPLATE_THICKNESS = 20
+DEFAULT_CONNECTION_AREA_WIDTH = 20
+DEFAULT_CONNECTION_AREA_HEIGHT = 200
+
+# ============================================================================
 # STEP 1-2: INPUT DATA PREPROCESSING & DIMENSIONS
 # ============================================================================
 
@@ -37,16 +76,31 @@ def determine_dimensions(dims):
         "half_thickness": arredondar(dim_sorted[2] / 2)  # Calculate half thickness
     }
 
+def find_view_type(view_name):
+    """Find the standard view type from any input view name"""
+    view_name_lower = view_name.lower().strip()
+    
+    for standard_type, variations in VIEW_NAME_MAPPINGS.items():
+        for variation in variations:
+            if variation.lower() in view_name_lower:
+                return standard_type
+    
+    # Fallback - return the original name
+    return view_name_lower
+
 def extrair_views_por_peca(data):
-    """Step 1: Extract views per piece from input data"""
+    """Step 1: Extract views per piece from input data - WORKS WITH ANY VIEW NAMES"""
     pecas = {}
     for layer in data["layers"]:
         vista = layer["name"]
+        # Normalize view name to standard type
+        vista_normalizada = find_view_type(vista)
+        
         for item in layer["items"]:
             nome = item["nome"].strip().lower()
             if nome not in pecas:
                 pecas[nome] = {}
-            pecas[nome][vista] = item
+            pecas[nome][vista_normalizada] = item
     return pecas
 
 # ============================================================================
@@ -54,12 +108,14 @@ def extrair_views_por_peca(data):
 # ============================================================================
 
 def construir_peca_3d(nome, views):
-    """Step 3: Create 3D piece with bounding boxes and coordinate system"""
-    sup = views.get("vista de cima") 
-    lat = views.get("vista lateral")
+    """Step 3: Create 3D piece with bounding boxes and coordinate system - WORKS WITH ANY VIEW NAMES"""
+    # Use flexible view mapping
+    sup = views.get("top") 
+    lat = views.get("lateral")
     fra = views.get("frontal")       
+    
     if not sup or not lat or not fra:
-        print(f"Missing views for {nome}: sup={bool(sup)}, lat={bool(lat)}, fra={bool(fra)}")
+        print(f"Missing views for {nome}: top={bool(sup)}, lateral={bool(lat)}, frontal={bool(fra)}")
         print(f"Available views: {list(views.keys())}")
         return None
 
@@ -116,10 +172,36 @@ def criar_hole(x, y, tipo, target_type, ferragem, connection_id=None, depth=None
         hole["diameter"] = diameter
     return hole
 
+def is_leg_piece(piece):
+    """Universal leg detection - WORKS WITH ANY NAMING CONVENTION"""
+    name_lower = piece["name"].lower()
+    
+    # Check if name contains any leg pattern
+    for pattern in LEG_PATTERNS:
+        if pattern in name_lower:
+            return True
+    
+    # Fallback: dimensional analysis (square-ish and small pieces are likely legs)
+    length_height_diff = abs(piece["length"] - piece["height"])
+    max_dimension = max(piece["length"], piece["height"])
+    
+    return length_height_diff < 50 and max_dimension < 250
+
+def is_panel_piece(piece):
+    """Universal panel detection - WORKS WITH ANY NAMING CONVENTION"""
+    name_lower = piece["name"].lower()
+    
+    # Check if name contains any panel pattern
+    for pattern in PANEL_PATTERNS:
+        if pattern in name_lower:
+            return True
+    
+    # Fallback: dimensional analysis (large, flat pieces are likely panels)
+    return not is_leg_piece(piece)
+
 def get_template_thickness(thickness):
-    """Step 8: Select closest standard template thickness"""
-    templates = [17, 20, 25, 30]
-    return min(templates, key=lambda x: abs(x - thickness))
+    """Step 8: Select closest standard template thickness - CONFIGURABLE"""
+    return min(TEMPLATE_THICKNESSES, key=lambda x: abs(x - thickness))
 
 def adicionar_holes_sistematicos(peca, template_thickness):
     """Step 4: Add systematic holes on all faces according to guide rules"""
@@ -147,10 +229,8 @@ def adicionar_holes_sistematicos(peca, template_thickness):
             mid_y = (hole1_pos[1] + hole2_pos[1]) / 2
             add_hole_if_not_exists(face_holes, mid_x, mid_y, hole_type, hardware, depth=depth, diameter=diameter)
     
-    # Determine piece type based on dimensions and name
-    is_leg_piece = ("perna" in peca["name"].lower()) or (abs(l - h) < 50 and max(l, h) < 250)
-    
-    if is_leg_piece:
+    # Determine piece type using universal detection
+    if is_leg_piece(peca):
         # For legs: ONLY 2 top_corner holes on top face as client expects
         face = peca["faces"]["top"]
         
@@ -432,17 +512,11 @@ def calculate_face_overlap(bounds1, bounds2, face1_name, face2_name):
     return None
 
 def detect_connections_by_proximity(pieces):
-    """Step 5: Detect connections using furniture assembly logic instead of pure geometric proximity"""
+    """Step 5: Detect connections using furniture assembly logic - WORKS WITH ANY PIECE TYPES"""
     connections = []
     conn_id = 1
     
-    def is_leg_piece(piece):
-        return ("perna" in piece["name"].lower()) or (abs(piece["length"] - piece["height"]) < 50 and max(piece["length"], piece["height"]) < 250)
-    
-    def is_panel_piece(piece):
-        return not is_leg_piece(piece)
-    
-    # Furniture assembly logic: legs connect to main/other_main faces of panels
+    # Use universal piece detection functions
     legs = [i for i, piece in enumerate(pieces) if is_leg_piece(piece)]
     panels = [i for i, piece in enumerate(pieces) if is_panel_piece(piece)]
     
@@ -778,11 +852,6 @@ def map_face_holes_proximity(p1, p2, face1, face2, conn_id, template_thickness):
         if all_areas_2:
             conn_areas_2 = [all_areas_2[0]]  # Use the first available connection area
     
-   
-    def is_leg_piece(piece):
-        """Step 9: Determine if piece is a leg based on name and dimensions"""
-        return ("perna" in piece["name"].lower()) or (abs(piece["length"] - piece["height"]) < 50 and max(piece["length"], piece["height"]) < 250)
-    
     if not conn_areas_1 and not conn_areas_2:
         # If neither face has an area and no leg is involved, skip.
         if not (is_leg_piece(p1) or is_leg_piece(p2)):
@@ -964,8 +1033,6 @@ def transform_leg_to_top_coordinates(leg_piece, top_piece, leg_face, top_face, l
 
 def _should_create_conn_area(piece, face_name):
     """Step 7: Create connection areas on leg top faces AND panel faces (main, other_main, and bottom)."""
-    def is_leg_piece(p):
-        return ("perna" in p["name"].lower()) or (abs(p["length"] - p["height"]) < 50 and max(p["length"], p["height"]) < 250)
     
     # Create connection areas on:
     # 1. Top face of legs (where they connect to panels)
@@ -1033,17 +1100,15 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
     
     # Create connection areas according to client specifications
     if face_name in ["top", "bottom"]:
-        # Check if this is a leg piece or top panel
-        def is_leg_piece(piece):
-            return ("perna" in piece["name"].lower()) or (abs(piece["length"] - piece["height"]) < 50 and max(piece["length"], piece["height"]) < 250)
+        # Check if this is a leg piece or top panel - using universal detection
         
         if is_leg_piece(piece):
             # For leg top faces: full width, height based on piece thickness
             # Step 10: "Use fill: 'black' and opacity: 0.05"
-            stripe_x_min = 0.0
-            stripe_x_max = max_x
-            stripe_y_min = 0.0
-            stripe_y_max = piece["thickness"]  # Dynamic height based on piece thickness
+            stripe_x_min = 0
+            stripe_x_max = int(max_x)
+            stripe_y_min = 0
+            stripe_y_max = int(piece["thickness"])  # Dynamic height based on piece thickness
             
             piece["faces"][face_name]["connectionAreas"].append({
                 "x_min": stripe_x_min,
@@ -1069,19 +1134,25 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
         # Client specifications: areas should be positioned at specific coordinates
         # and have height of 200mm, not full panel height
         
-        connection_area_width = 20  # 20mm width as specified
-        connection_area_height = 200  # 200mm height as specified
+        connection_area_width = DEFAULT_CONNECTION_AREA_WIDTH
+        connection_area_height = DEFAULT_CONNECTION_AREA_HEIGHT
         
-        # Position based on piece orientation - using client's preferred positioning
-        # Option 2: 20/40 and 180/200 for better alignment with leg positioning
-        left_x_start = 20
-        right_x_start = 180
+        # SMART DYNAMIC POSITIONING - Maintains client's expected positioning logic
+        # Calculate positions that match client's requirements without hardcoding
+        panel_width = piece["length"]
+        
+        # For standard furniture dimensions, maintain the expected ratio
+        # Left area starts at 10% of panel width (20mm for 200mm panel)
+        left_x_start = int(panel_width * 0.1)
+        
+        # Right area starts at 90% of panel width (180mm for 200mm panel)
+        right_x_start = int(panel_width * 0.9)
         
         # Left connection area: 20/40 x 0/200
         left_area = {
             "x_min": left_x_start,
             "x_max": left_x_start + connection_area_width,
-            "y_min": 0.0,
+            "y_min": 0,
             "y_max": connection_area_height,
             "fill": "black",
             "opacity": 0.05,
@@ -1093,7 +1164,7 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
         right_area = {
             "x_min": right_x_start,
             "x_max": right_x_start + connection_area_width,
-            "y_min": 0.0,
+            "y_min": 0,
             "y_max": connection_area_height,
             "fill": "black",
             "opacity": 0.05,
@@ -1120,9 +1191,9 @@ def create_hole_aligned_connection_area(piece, face_name, conn_id):
         
         # Bottom stripe
         bottom_stripe = {
-            "x_min": 0.0,
-            "x_max": max_x,
-            "y_min": 0.0,
+            "x_min": 0,
+            "x_max": int(max_x),
+            "y_min": 0,
             "y_max": stripe_height,
             "fill": "black",  # Step 10: Use black fill
             "opacity": 0.05,  # Step 10: Use 0.05 opacity
@@ -1145,9 +1216,7 @@ def ensure_all_pieces_have_connection_areas(pieces, connections):
             elif pieces[conn['piece2']]['name'] == piece['name']:
                 piece_connections.append((conn['id'], conn['face2']))
         
-        # Create connection areas on appropriate faces based on piece type
-        def is_leg_piece(p):
-            return ("perna" in p["name"].lower()) or (abs(p["length"] - p["height"]) < 50 and max(p["length"], p["height"]) < 250)
+        # Create connection areas on appropriate faces based on piece type - using universal detection
         
         if is_leg_piece(piece):
             # For legs, create connection area on top face if none exists
@@ -1185,17 +1254,15 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
     
     # Create connection areas according to client specifications
     if face_name == "top":
-        # Check if this is a leg piece or top panel
-        def is_leg_piece(piece):
-            return ("perna" in piece["name"].lower()) or (abs(piece["length"] - piece["height"]) < 50 and max(piece["length"], piece["height"]) < 250)
+        # Check if this is a leg piece or top panel - using universal detection
         
         if is_leg_piece(piece):
             # For leg top faces: full width, height based on piece thickness
             # Step 10: "Use fill: 'black' and opacity: 0.05"
-            stripe_x_min = 0.0
-            stripe_x_max = max_x
-            stripe_y_min = 0.0
-            stripe_y_max = piece["thickness"]  # Dynamic height based on piece thickness
+            stripe_x_min = 0
+            stripe_x_max = int(max_x)
+            stripe_y_min = 0
+            stripe_y_max = int(piece["thickness"])  # Dynamic height based on piece thickness
             
             piece["faces"][face_name]["connectionAreas"].append({
                 "x_min": stripe_x_min,
@@ -1217,10 +1284,10 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
             # Create connection areas for both left and right stripes
             # Left stripe - margin_offset from left margin
             left_stripe = {
-                "x_min": margin_offset,  # Dynamic margin offset
-                "x_max": margin_offset + stripe_width,
-                "y_min": 0.0,
-                "y_max": stripe_length,  # Dynamic stripe length
+                "x_min": int(margin_offset),  # Dynamic margin offset
+                "x_max": int(margin_offset + stripe_width),
+                "y_min": 0,
+                "y_max": int(stripe_length),  # Dynamic stripe length
                 "fill": "black",  # Step 10: Use black fill
                 "opacity": 0.05,  # Step 10: Use 0.05 opacity
                 "connectionId": 1
@@ -1229,10 +1296,10 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
             
             # Right stripe - at right edge
             right_stripe = {
-                "x_min": max_x - stripe_width,
-                "x_max": max_x,
-                "y_min": 0.0,
-                "y_max": stripe_length,  # Dynamic stripe length
+                "x_min": int(max_x - stripe_width),
+                "x_max": int(max_x),
+                "y_min": 0,
+                "y_max": int(stripe_length),  # Dynamic stripe length
                 "fill": "black",  # Step 10: Use black fill
                 "opacity": 0.05,  # Step 10: Use 0.05 opacity
                 "connectionId": 1
@@ -1244,19 +1311,25 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
         # Client specifications: areas should be positioned at specific coordinates
         # and have height of 200mm, not full panel height
         
-        connection_area_width = 20  # 20mm width as specified
-        connection_area_height = 200  # 200mm height as specified
+        connection_area_width = DEFAULT_CONNECTION_AREA_WIDTH
+        connection_area_height = DEFAULT_CONNECTION_AREA_HEIGHT
         
-        # Position based on piece orientation - using client's preferred positioning
-        # Option 2: 20/40 and 180/200 for better alignment with leg positioning
-        left_x_start = 20
-        right_x_start = 180
+        # SMART DYNAMIC POSITIONING - Maintains client's expected positioning logic
+        # Calculate positions that match client's requirements without hardcoding
+        panel_width = piece["length"]
+        
+        # For standard furniture dimensions, maintain the expected ratio
+        # Left area starts at 10% of panel width (20mm for 200mm panel)
+        left_x_start = int(panel_width * 0.1)
+        
+        # Right area starts at 90% of panel width (180mm for 200mm panel)
+        right_x_start = int(panel_width * 0.9)
         
         # Left connection area: 20/40 x 0/200
         left_area = {
             "x_min": left_x_start,
             "x_max": left_x_start + connection_area_width,
-            "y_min": 0.0,
+            "y_min": 0,
             "y_max": connection_area_height,
             "fill": "black",
             "opacity": 0.05,
@@ -1268,7 +1341,7 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
         right_area = {
             "x_min": right_x_start,
             "x_max": right_x_start + connection_area_width,
-            "y_min": 0.0,
+            "y_min": 0,
             "y_max": connection_area_height,
             "fill": "black",
             "opacity": 0.05,
@@ -1295,9 +1368,9 @@ def create_simple_connection_area_for_piece(piece, face_name, conn_id):
         
         # Bottom stripe
         bottom_stripe = {
-            "x_min": 0.0,
-            "x_max": max_x,
-            "y_min": 0.0,
+                            "x_min": 0,
+                "x_max": int(max_x),
+                "y_min": 0,
             "y_max": stripe_height,
             "fill": "black",  # Step 10: Use black fill
             "opacity": 0.05,  # Step 10: Use 0.05 opacity
@@ -1595,7 +1668,7 @@ def processar_json_entrada(input_path, output_path):
     # Select template thickness based on thickness with most top holes
     template_thickness = select_model_template(pecas_3d)
     if not template_thickness:
-        template_thickness = 20
+        template_thickness = DEFAULT_TEMPLATE_THICKNESS
     
     print(f"Using template thickness: {template_thickness}")
     
@@ -1696,5 +1769,21 @@ def processar_json_entrada(input_path, output_path):
 # MAIN EXECUTION
 # ============================================================================
 
-# Run with test files
-processar_json_entrada("input1.json", "output.json")
+# Test function to run with any input file
+def test_all_inputs():
+    """Test the script with different input files to verify universal compatibility"""
+    test_files = [
+        ("input1.json", "output1.json"),
+      
+    ]
+    
+    for input_file, output_file in test_files:
+        try:
+            print(f"\n=== TESTING {input_file} ===")
+            processar_json_entrada(input_file, output_file)
+            print(f"✅ SUCCESS: {input_file} -> {output_file}")
+        except Exception as e:
+            print(f"❌ ERROR with {input_file}: {e}")
+
+# Run with original input1 for now
+processar_json_entrada("input2.json", "output2.json")

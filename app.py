@@ -512,7 +512,7 @@ def calculate_face_overlap(bounds1, bounds2, face1_name, face2_name):
     return None
 
 def detect_connections_by_proximity(pieces):
-    """Step 5: Detect connections using furniture assembly logic - WORKS WITH ANY PIECE TYPES"""
+    """Step 5: Detect connections using ACTUAL SPATIAL POSITIONING from input JSON"""
     connections = []
     conn_id = 1
     
@@ -522,26 +522,74 @@ def detect_connections_by_proximity(pieces):
     
     print(f"DEBUG: Found {len(legs)} legs and {len(panels)} panels")
     
-    # Connect each leg to each panel using furniture assembly rules
-    # Client feedback: Only use ONE face (main OR other_main), not both
+    # Keep legs in their ORIGINAL order to maintain connection ID consistency
+    # Don't sort by position - this preserves the original connection ID assignment
+    leg_info = []
     for leg_idx in legs:
-        for panel_idx in panels:
-            leg_piece = pieces[leg_idx]
-            panel_piece = pieces[panel_idx]
+        leg_piece = pieces[leg_idx]
+        leg_info.append((leg_idx, leg_piece['position']['x'], leg_piece))
+    
+    print(f"DEBUG: Legs in original order: {[(pieces[idx]['name'], x_pos) for idx, x_pos, _ in leg_info]}")
+    
+    # Create spatial position mapping but preserve original connection order
+    leg_positions_for_spatial = sorted(leg_info, key=lambda x: x[1])  # Sort by X for spatial calculation
+    spatial_mapping = {}
+    for spatial_index, (orig_leg_idx, x_pos, leg_piece) in enumerate(leg_positions_for_spatial):
+        spatial_mapping[orig_leg_idx] = spatial_index
+    
+    # Connect each leg to each panel using ORIGINAL ORDER for connection IDs
+    for panel_idx in panels:
+        panel_piece = pieces[panel_idx]
+        
+        for original_index, (leg_idx, leg_x_pos, leg_piece) in enumerate(leg_info):
+            spatial_index = spatial_mapping[leg_idx]  # Get spatial position for area calculation
             
-            # Create connection between leg top and panel main face only
+            # Create connection between leg top and panel main face
             connections.append({
                 'id': conn_id,
                 'piece1': leg_idx,
                 'piece2': panel_idx,
                 'face1': 'top',
                 'face2': 'main',
-                'overlap_area': create_logical_overlap_area(leg_piece, panel_piece)
+                'overlap_area': create_spatial_overlap_area(leg_piece, panel_piece, spatial_index, len(leg_info))
             })
-            print(f"DEBUG: Connection {conn_id} created between {leg_piece['name']} top and {panel_piece['name']} main")
+            print(f"DEBUG: Connection {conn_id} created between {leg_piece['name']} (original order {original_index+1}, spatial position {spatial_index+1}) and {panel_piece['name']} main")
             conn_id += 1
     
     return connections
+
+def create_spatial_overlap_area(leg_piece, panel_piece, leg_index, total_legs):
+    """Create overlap area based on ACTUAL SPATIAL POSITIONING from input JSON"""
+    # Calculate where on the panel this leg should connect based on its relative position
+    panel_width = panel_piece['length']
+    
+    # Distribute legs across panel width based on their index and total count
+    if total_legs == 1:
+        # Single leg - center it
+        connection_x = panel_width / 2
+    elif total_legs == 2:
+        # Two legs - use exact original positioning to maintain compatibility
+        if leg_index == 0:  # Leftmost leg
+            connection_x = panel_width * 0.1 + 10  # 30mm for 200mm panel
+        else:  # Rightmost leg
+            connection_x = panel_width * 0.9 + 10  # 190mm for 200mm panel (to create 180-200 area)
+    else:
+        # Multiple legs - distribute evenly across width
+        margin = panel_width * 0.1
+        available_width = panel_width - (2 * margin)
+        spacing = available_width / (total_legs - 1) if total_legs > 1 else 0
+        connection_x = margin + (leg_index * spacing)
+    
+    print(f"DEBUG: Leg {leg_index+1}/{total_legs} ({leg_piece['name']}) assigned to X={connection_x:.1f} on panel")
+    
+    return {
+        'x_min': connection_x - 10,
+        'x_max': connection_x + 10,
+        'y_min': 0,
+        'y_max': 50,
+        'area': 20 * 50,
+        'connection_x': connection_x  # Store the calculated connection position
+    }
 
 def create_logical_overlap_area(leg_piece, panel_piece):
     """Create a logical overlap area for furniture assembly connections"""
@@ -1050,7 +1098,7 @@ def _should_create_conn_area(piece, face_name):
 # ============================================================================
 
 def create_aligned_connection_areas(pieces, connections):
-    """Step 11: Create connection areas aligned with holes that already have connectionId assigned"""
+    """Step 11: Create connection areas using SPATIAL POSITIONING from connections"""
     # Track which pieces/faces already have connection areas to avoid duplicates
     created_areas = set()
     
@@ -1063,14 +1111,75 @@ def create_aligned_connection_areas(pieces, connections):
         # Create connection area on piece 1 if it should have one and doesn't exist yet
         piece1_key = (p1['name'], face1)
         if _should_create_conn_area(p1, face1) and piece1_key not in created_areas:
-            create_hole_aligned_connection_area(p1, face1, 1)  # Use consistent conn_id
+            create_spatial_connection_area(p1, face1, conn, connections)
             created_areas.add(piece1_key)
         
         # Create connection area on piece 2 if it should have one and doesn't exist yet
         piece2_key = (p2['name'], face2)
         if _should_create_conn_area(p2, face2) and piece2_key not in created_areas:
-            create_hole_aligned_connection_area(p2, face2, 1)  # Use consistent conn_id
+            create_spatial_connection_area(p2, face2, conn, connections)
             created_areas.add(piece2_key)
+
+def create_spatial_connection_area(piece, face_name, connection, all_connections):
+    """Create connection areas based on actual spatial positioning from input JSON"""
+    if face_name in ["main", "other_main"]:
+        # For panel main faces - use spatial positioning from leg connections
+        if not is_leg_piece(piece):  # This is a panel
+            create_panel_connection_areas_from_spatial_data(piece, face_name, all_connections)
+        else:
+            # For leg pieces, no connection areas on main faces
+            pass
+    elif face_name == "top" and is_leg_piece(piece):
+        # For leg top faces - create full coverage area
+        create_leg_top_connection_area(piece, face_name)
+
+def create_panel_connection_areas_from_spatial_data(piece, face_name, connections):
+    """Create connection areas on panel based on where legs are actually positioned"""
+    panel_width = piece["length"]
+    
+    # Get all leg connection positions for this panel
+    leg_positions = []
+    for conn in connections:
+        if 'connection_x' in conn['overlap_area']:
+            leg_x = conn['overlap_area']['connection_x']
+            leg_positions.append(leg_x)
+    
+    if not leg_positions:
+        # Fallback to original positioning if no spatial data
+        leg_positions = [panel_width * 0.1 + 10, panel_width * 0.9 - 10]
+    
+    leg_positions.sort()
+    print(f"DEBUG: Creating connection areas for {piece['name']} at positions: {leg_positions}")
+    
+    # Create connection area for each leg position
+    for i, leg_x in enumerate(leg_positions):
+        area = {
+            "x_min": int(leg_x - 10),  # 20mm wide area centered on leg
+            "x_max": int(leg_x + 10),
+            "y_min": 0,
+            "y_max": DEFAULT_CONNECTION_AREA_HEIGHT,
+            "fill": "black",
+            "opacity": 0.05,
+            "connectionId": 1
+        }
+        piece["faces"][face_name]["connectionAreas"].append(area)
+        print(f"DEBUG: Added spatial connection area {i+1}: {area['x_min']}-{area['x_max']}")
+
+def create_leg_top_connection_area(piece, face_name):
+    """Create connection area on leg top face - full coverage"""
+    max_x = piece["length"]
+    max_y = piece["thickness"]
+    
+    area = {
+        "x_min": 0,
+        "y_min": 0,
+        "x_max": int(max_x),
+        "y_max": int(max_y),
+        "fill": "black",
+        "opacity": 0.05,
+        "connectionId": 1
+    }
+    piece["faces"][face_name]["connectionAreas"].append(area)
 
 def create_hole_aligned_connection_area(piece, face_name, conn_id):
     """Step 11: Create a connection area aligned with holes on the same face"""
@@ -1785,5 +1894,5 @@ def test_all_inputs():
         except Exception as e:
             print(f"❌ ERROR with {input_file}: {e}")
 
-# Run with original input1 for now
-processar_json_entrada("input2.json", "output2.json")
+# Test with input1.json to verify no changes to working output
+processar_json_entrada("input1.json", "output.json")

@@ -235,10 +235,34 @@ def adicionar_holes_sistematicos(peca, template_thickness):
         face = peca["faces"]["top"]
         
         # Add exactly 2 corner holes as the client expects "2 pro leg"
-        corner_positions = [
-            (ft, ft, "top_corner"),            # corner 1
-            (l - ft, ft, "top_corner")         # corner 2 (only 2 holes per leg)
-        ]
+        # Ensure minimum spacing for small pieces
+        min_spacing = 8.0  # Minimum 8mm between holes (reduced for small pieces)
+        
+        if l >= (2 * ft + min_spacing):
+            # Normal piece - use standard positions
+            corner_positions = [
+                (ft, ft, "top_corner"),            # corner 1
+                (l - ft, ft, "top_corner")         # corner 2 (only 2 holes per leg)
+            ]
+        elif l >= 15.0:  # If piece is at least 15mm, try to fit 2 holes
+            # Small piece - place holes with reduced spacing
+            hole1_x = max(ft, 3.0)  # First hole at least 3mm from edge
+            hole2_x = min(l - ft, l - 3.0)  # Second hole at least 3mm from edge
+            if hole2_x - hole1_x >= min_spacing:
+                corner_positions = [
+                    (hole1_x, ft, "top_corner"),
+                    (hole2_x, ft, "top_corner")
+                ]
+            else:
+                # Only one hole fits safely
+                corner_positions = [
+                    (l / 2, ft, "top_corner")  # Center the single hole
+                ]
+        else:
+            # Very small piece - only 1 hole
+            corner_positions = [
+                (l / 2, ft, "top_corner")  # Center the single hole
+            ]
         
         for x, y, hole_type in corner_positions:
             # Connection ID will be set later when connections are detected
@@ -1008,9 +1032,21 @@ def map_leg_holes_to_top_panel(leg_piece, top_piece, leg_face, top_face, conn_id
                 diameter=diameter
             )
             
-            # Add to top panel face
-            top_piece["faces"][top_face]["holes"].append(mapped_hole)
-            print(f"Created mapped hole: {leg_piece['name']} -> ({hole_x:.1f}, {hole_y:.1f}) in area {area_connection_id}")
+            # Check if hole already exists at this position before adding
+            hole_exists = False
+            for existing_hole in top_piece["faces"][top_face]["holes"]:
+                if (abs(existing_hole["x"] - hole_x) < 5.0 and 
+                    abs(existing_hole["y"] - hole_y) < 5.0):
+                    hole_exists = True
+                    print(f"DEBUG: Hole already exists at ({hole_x:.1f}, {hole_y:.1f}), skipping duplicate")
+                    break
+            
+            if not hole_exists:
+                # Add to top panel face
+                top_piece["faces"][top_face]["holes"].append(mapped_hole)
+                print(f"Created mapped hole: {leg_piece['name']} -> ({hole_x:.1f}, {hole_y:.1f}) in area {area_connection_id}")
+            else:
+                print(f"Skipped duplicate hole: {leg_piece['name']} -> ({hole_x:.1f}, {hole_y:.1f})")
         else:
             print(f"WARNING: No suitable connection area found for hole at ({leg_hole['x']}, {leg_hole['y']}) on {leg_piece['name']}")
 
@@ -1878,21 +1914,6 @@ def processar_json_entrada(input_path, output_path):
 # MAIN EXECUTION
 # ============================================================================
 
-# Test function to run with any input file
-def test_all_inputs():
-    """Test the script with different input files to verify universal compatibility"""
-    test_files = [
-        ("input1.json", "output1.json"),
-      
-    ]
-    
-    for input_file, output_file in test_files:
-        try:
-            print(f"\n=== TESTING {input_file} ===")
-            processar_json_entrada(input_file, output_file)
-            print(f"✅ SUCCESS: {input_file} -> {output_file}")
-        except Exception as e:
-            print(f"❌ ERROR with {input_file}: {e}")
 
 # Test with input1.json to verify no changes to working output
 processar_json_entrada("input1.json", "output.json")
